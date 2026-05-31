@@ -1,0 +1,26 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar pytest
+        run: pip install pytest
+
+      - name: Ejecutar los tests de cada herramienta
+        run: |
+          for dir in tools/*/; do
+            echo "== $dir =="
+            (cd "$dir" && python -m pytest -q)
+          done
