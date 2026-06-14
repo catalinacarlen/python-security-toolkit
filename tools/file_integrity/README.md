@@ -12,8 +12,12 @@ Builds a baseline manifest (each file → hash + permissions). On later runs it 
 - **Detection = set comparison.** Files in both manifests with a different hash are *modified*; same hash but different mode are *permission* changes; only-in-new are *new*; only-in-baseline are *deleted*.
 
 ## Usage
+
+With the toolkit installed (`pip install -e .`), use the unified CLI: `pstk fim ...` is equivalent to `python3 file_integrity.py ...`.
+
 ```bash
 # create a signed baseline
+pstk fim baseline ./my_dir -o baseline.json -k "secret-key"   # same as the script below
 python3 file_integrity.py baseline ./my_dir -o baseline.json -k "secret-key"
 
 # later, verify integrity (checks the signature too)
@@ -64,8 +68,12 @@ Construye una línea de base (cada archivo → hash + permisos). En ejecuciones 
 - **Detección = comparación de conjuntos.** Archivos en ambos manifiestos con hash distinto son *modificados*; mismo hash pero distinto modo son cambios de *permisos*; solo-en-nuevo son *nuevos*; solo-en-base son *eliminados*.
 
 ## Uso
+
+Con el toolkit instalado (`pip install -e .`), usá el CLI unificado: `pstk fim ...` equivale a `python3 file_integrity.py ...`.
+
 ```bash
 # crear una línea de base firmada
+pstk fim baseline ./mi_dir -o baseline.json -k "clave-secreta"   # igual que el script de abajo
 python3 file_integrity.py baseline ./mi_dir -o baseline.json -k "clave-secreta"
 
 # más tarde, verificar integridad (chequea también la firma)

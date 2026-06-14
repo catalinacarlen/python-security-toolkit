@@ -12,7 +12,11 @@ Given a host and a port range, it reports open ports, grabs each service's banne
 - **Rate and concurrency.** Scanning is I/O-bound (mostly waiting on the network), so a thread pool (`-W`) speeds it up massively. A `-d` delay throttles banner grabs to stay quiet and avoid tripping defenses.
 
 ## Usage
+
+With the toolkit installed (`pip install -e .`), use the unified CLI: `pstk scan ...` is equivalent to `python3 port_scanner.py ...`.
+
 ```bash
+pstk scan 127.0.0.1                                # same as the script below
 python3 port_scanner.py 127.0.0.1                  # ports 1-1024, with banners
 python3 port_scanner.py scanme.nmap.org -s 20 -e 100 -t 1.0
 python3 port_scanner.py 10.0.0.5 -W 200 -d 0.1     # 200 workers, 0.1s throttle
@@ -59,7 +63,11 @@ Dado un host y un rango de puertos, informa los puertos abiertos, captura el ban
 - **Rate y concurrencia.** El escaneo está limitado por E/S (casi todo es esperar la red), así que un pool de hilos (`-W`) lo acelera muchísimo. Un retardo `-d` modera los banners para ser más sigiloso y no disparar defensas.
 
 ## Uso
+
+Con el toolkit instalado (`pip install -e .`), usá el CLI unificado: `pstk scan ...` equivale a `python3 port_scanner.py ...`.
+
 ```bash
+pstk scan 127.0.0.1                                # igual que el script de abajo
 python3 port_scanner.py 127.0.0.1                  # puertos 1-1024, con banners
 python3 port_scanner.py scanme.nmap.org -s 20 -e 100 -t 1.0
 python3 port_scanner.py 10.0.0.5 -W 200 -d 0.1     # 200 hilos, 0.1s de retardo

@@ -16,8 +16,12 @@ An auditor for passwords: it measures strength by **real entropy (bits)**, estim
 - **Storage done right.** `SHA-256` is fast, which is exactly what you *don't* want for stored passwords. `derivar()` uses PBKDF2 with a random per-user salt and 200k iterations, and verification uses a constant-time comparison to avoid timing attacks.
 
 ## Usage
+
+With the toolkit installed (`pip install -e .`), use the unified CLI: `pstk pwd ...` is equivalent to `python3 password_toolkit.py ...`.
+
 ```bash
 # full report (entropy + crack time + breach check)
+pstk pwd auditar "C0rr3ct-H0rs3_Battery$taple!9"            # same as the script below
 python3 password_toolkit.py auditar "C0rr3ct-H0rs3_Battery$taple!9"
 python3 password_toolkit.py --json auditar --offline "Abc123!"   # no network
 
@@ -74,8 +78,12 @@ Un auditor de contraseñas: mide la fortaleza por **entropía real (bits)**, est
 - **Almacenamiento bien hecho.** `SHA-256` es rápido, justo lo que *no* querés para contraseñas guardadas. `derivar()` usa PBKDF2 con salt aleatorio por usuario y 200k iteraciones, y la verificación usa comparación en tiempo constante para evitar ataques de temporización.
 
 ## Uso
+
+Con el toolkit instalado (`pip install -e .`), usá el CLI unificado: `pstk pwd ...` equivale a `python3 password_toolkit.py ...`.
+
 ```bash
 # reporte completo (entropía + crack time + filtraciones)
+pstk pwd auditar "C0rr3ct-H0rs3_Battery$taple!9"            # igual que el script de abajo
 python3 password_toolkit.py auditar "C0rr3ct-H0rs3_Battery$taple!9"
 python3 password_toolkit.py --json auditar --offline "Abc123!"   # sin red
 

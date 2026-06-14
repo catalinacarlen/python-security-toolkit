@@ -20,7 +20,11 @@ The rules also separate *shapes* of attack. Brute force is many tries against **
 Every finding is a structured dict (`rule`, `severity`, `ip`, `description`, `evidence`), which is why `--json` output drops cleanly into other tools or a real SIEM pipeline.
 
 ## Usage
+
+With the toolkit installed (`pip install -e .`), use the unified CLI: `pstk logs ...` is equivalent to `python3 log_analyzer.py ...`.
+
 ```bash
+pstk logs sample_auth.log                                     # same as the script below
 python3 log_analyzer.py sample_auth.log                       # text report
 python3 log_analyzer.py /var/log/auth.log -u 10 -v 2          # threshold 10, 2-min window
 python3 log_analyzer.py sample_auth.log -w 45.33.12.6,9.9.9.9 # watchlist -> critical
@@ -77,7 +81,11 @@ Las reglas también separan las *formas* del ataque. La fuerza bruta es muchos i
 Cada hallazgo es un dict estructurado (`regla`, `severidad`, `ip`, `descripcion`, `evidencia`), por eso la salida `--json` encaja limpio en otras herramientas o en un pipeline de SIEM real.
 
 ## Uso
+
+Con el toolkit instalado (`pip install -e .`), usá el CLI unificado: `pstk logs ...` equivale a `python3 log_analyzer.py ...`.
+
 ```bash
+pstk logs sample_auth.log                                     # igual que el script de abajo
 python3 log_analyzer.py sample_auth.log                       # reporte de texto
 python3 log_analyzer.py /var/log/auth.log -u 10 -v 2          # umbral 10, ventana 2 min
 python3 log_analyzer.py sample_auth.log -w 45.33.12.6,9.9.9.9 # watchlist -> crítica

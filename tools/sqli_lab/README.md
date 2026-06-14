@@ -22,7 +22,11 @@ The fix is **parameterized queries**: the SQL (`… WHERE usuario = ?`) and the 
 The **classifier** mirrors how detection tools triage input: UNION+SELECT → `union`; sleep/`randomblob`/`waitfor` → `time_blind`; stacked `;` + SELECT → `stacked`; `OR 1=1` → `tautologia`; comment markers → `auth_bypass`; clean input → `ninguna`. It's a heuristic, not a guarantee — but it shows the reasoning behind a WAF rule.
 
 ## Usage
+
+With the toolkit installed (`pip install -e .`), use the unified CLI: `pstk sqli ...` is equivalent to `python3 sqli_lab.py ...`.
+
 ```bash
+pstk sqli --demo                                                      # same as the script below
 python3 sqli_lab.py --demo
 python3 sqli_lab.py --clasificar "x' UNION SELECT a,b FROM users --"   # -> union
 python3 sqli_lab.py --clasificar "Cata"                                # -> ninguna
@@ -79,7 +83,11 @@ La solución son las **consultas parametrizadas**: el SQL (`… WHERE usuario = 
 El **clasificador** imita cómo las herramientas de detección triagean la entrada: UNION+SELECT → `union`; sleep/`randomblob`/`waitfor` → `time_blind`; `;` apilado + SELECT → `stacked`; `OR 1=1` → `tautologia`; marcadores de comentario → `auth_bypass`; entrada limpia → `ninguna`. Es una heurística, no una garantía — pero muestra el razonamiento detrás de una regla de WAF.
 
 ## Uso
+
+Con el toolkit instalado (`pip install -e .`), usá el CLI unificado: `pstk sqli ...` equivale a `python3 sqli_lab.py ...`.
+
 ```bash
+pstk sqli --demo                                                      # igual que el script de abajo
 python3 sqli_lab.py --demo
 python3 sqli_lab.py --clasificar "x' UNION SELECT a,b FROM users --"   # -> union
 python3 sqli_lab.py --clasificar "Cata"                                # -> ninguna
