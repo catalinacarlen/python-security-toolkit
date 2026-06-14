@@ -27,7 +27,7 @@ HERRAMIENTAS: dict[str, tuple[str, str]] = {
     "logs": ("log_analyzer", "Detección estilo SIEM sobre logs de autenticación"),
     "pwd": ("password_toolkit", "Auditoría de contraseñas (entropía, HIBP, hashing)"),
     "fim": ("file_integrity", "Monitor de integridad de archivos (FIM)"),
-    "sqli": ("sqli_lab", "Laboratorio educativo de SQL injection"),
+    "sqli": ("sqli_lab", "Demostración local de SQL injection"),
 }
 
 

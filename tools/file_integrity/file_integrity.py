@@ -11,7 +11,7 @@ Mejoras sobre un FIM básico:
   un cambio, la verificación de la firma falla y se detecta la manipulación.
 - **Modo watch**: vigila el directorio en intervalos y avisa apenas algo cambia.
 
-Solo librería estándar. Para uso educativo y en entornos autorizados.
+Solo librería estándar. Para uso en entornos autorizados.
 """
 
 from __future__ import annotations

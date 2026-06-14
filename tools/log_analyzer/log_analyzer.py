@@ -15,7 +15,7 @@ Cada hallazgo se emite como una "alerta" estructurada (regla, severidad, IP,
 evidencia, ventana temporal), apta para salida JSON y para encadenar con otras
 herramientas.
 
-Solo librería estándar. Para uso educativo y en entornos autorizados.
+Solo librería estándar. Para uso en entornos autorizados.
 """
 
 from __future__ import annotations

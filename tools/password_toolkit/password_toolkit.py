@@ -12,7 +12,7 @@ Capacidades:
 - **Hashing**: SHA-256 (integridad) y PBKDF2-HMAC-SHA256 con salt (almacenamiento
   de contraseñas hecho como corresponde).
 
-Solo librería estándar. Para uso educativo y en entornos autorizados.
+Solo librería estándar. Para uso en entornos autorizados.
 """
 
 from __future__ import annotations

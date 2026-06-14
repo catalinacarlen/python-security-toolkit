@@ -12,8 +12,8 @@ Familias demostradas:
 - Boolean-based blind (inferir información por verdadero/falso).
 - Time-based blind (inferir información por demora de la respuesta).
 
-ADVERTENCIA: el código vulnerable está escrito así A PROPÓSITO, con fines
-educativos. Nunca debe escribirse así en producción. Solo librería estándar.
+El código vulnerable es intencionalmente inseguro y existe solo con fines de
+demostración. No debe usarse en producción. Solo librería estándar.
 """
 
 from __future__ import annotations
@@ -120,7 +120,7 @@ def _demo() -> None:
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Laboratorio educativo de SQL Injection (local).")
+    parser = argparse.ArgumentParser(description="Demostración local de SQL Injection.")
     parser.add_argument("--demo", action="store_true", help="Ejecuta la demostración completa")
     parser.add_argument("--clasificar", metavar="PAYLOAD",
                         help="Clasifica un payload e indica su familia de inyección")

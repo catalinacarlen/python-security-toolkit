@@ -1,34 +1,40 @@
 # File Integrity Checker
 
-A File Integrity Monitor (FIM) that tracks not just **content** but **permissions**, can **sign its own baseline** so tampering is detectable, and offers a real-time **watch** mode. SHA-256 fingerprints + set comparison, the way Tripwire or AIDE work — plus the hardening those need to be trustworthy.
+File integrity monitoring (FIM) tool. It records a baseline of file hashes and permissions for a directory, and on later runs reports files that were modified, had their permissions changed, were added or were deleted. The baseline can be signed to detect tampering.
 
-## What it does
-Builds a baseline manifest (each file → hash + permissions). On later runs it re-scans and classifies every difference as **modified**, **permission-changed**, **new** or **deleted**. The baseline can be HMAC-signed, and `watch` reports changes as they happen.
+## Features
 
-## How it works (and why)
-- **Hashing.** SHA-256 turns any file into a 64-char fingerprint that is deterministic and collision-resistant: change one byte and the hash changes completely. Comparing hashes is a fast, exact proxy for comparing whole files.
-- **Permissions matter too.** An attacker can make a config `world-writable` or a script `setuid` **without changing a byte of content**. Storing the file mode and flagging permission changes catches that class of attack a content-only FIM would miss.
-- **Signed baseline (the key upgrade).** A FIM is only as trustworthy as its baseline — if an attacker edits `baseline.json` to match their tampered files, you'd see "no changes". With `-k`, the baseline is signed with **HMAC-SHA256**; loading it recomputes the signature and **refuses a baseline that was altered** without the key. Verification uses a constant-time compare.
-- **Detection = set comparison.** Files in both manifests with a different hash are *modified*; same hash but different mode are *permission* changes; only-in-new are *new*; only-in-baseline are *deleted*.
+- SHA-256 hashing of every file in a directory tree.
+- Permission tracking: changes to file mode are reported even when content is unchanged.
+- Optional HMAC-signed baseline; loading a tampered baseline fails verification.
+- Real-time `watch` mode via polling.
+- Plain-text or JSON output for the `check` command.
 
 ## Usage
 
-With the toolkit installed (`pip install -e .`), use the unified CLI: `pstk fim ...` is equivalent to `python3 file_integrity.py ...`.
-
 ```bash
-# create a signed baseline
-pstk fim baseline ./my_dir -o baseline.json -k "secret-key"   # same as the script below
-python3 file_integrity.py baseline ./my_dir -o baseline.json -k "secret-key"
-
-# later, verify integrity (checks the signature too)
-python3 file_integrity.py check ./my_dir -b baseline.json -k "secret-key"
-python3 file_integrity.py --json check ./my_dir -b baseline.json   # structured
-
-# watch a directory live
-python3 file_integrity.py watch ./my_dir -i 2
+pstk fim baseline ./directory -o baseline.json -k "secret-key"   # via the unified CLI
+python3 file_integrity.py baseline ./directory -o baseline.json -k "secret-key"   # standalone
 ```
 
-## Example output
+```bash
+pstk fim check ./directory -b baseline.json -k "secret-key"
+pstk fim --json check ./directory -b baseline.json
+pstk fim watch ./directory -i 2
+```
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `baseline <dir>` | Create a baseline (`-o` output path, `-k` signing key) |
+| `check <dir>` | Compare current state against a baseline (`-b` baseline, `-k` key) |
+| `watch <dir>` | Monitor a directory in real time (`-i` interval in seconds) |
+
+Change categories reported by `check`: modified, permission, new, deleted.
+
+## Output
+
 ```
 MODIFICADOS (1):
   config/app.conf
@@ -40,13 +46,12 @@ NUEVOS (1):
   uploads/shell.php
 ```
 
-## Security relevance
-A FIM detects unauthorized change: altered binaries, uploaded webshells, tampered configs, or a quietly relaxed permission. Signing the baseline closes the obvious bypass — attacking the detector itself.
+## Security considerations
 
-## Concepts applied
-Cryptographic hashing, HMAC signing (`hmac`), file permissions (`os.stat`), JSON read/write, directory traversal, polling, and set comparison.
+When the baseline is signed with `-k`, any modification to the baseline file is detected on load, which prevents an attacker from editing the baseline to conceal changes. Signature comparison is performed in constant time.
 
-## Tests
+## Testing
+
 ```bash
 pytest
 ```
@@ -56,35 +61,41 @@ pytest
 
 # File Integrity Checker (ES)
 
-Un monitor de integridad de archivos (FIM) que vigila no solo el **contenido** sino los **permisos**, puede **firmar su propia línea de base** para detectar manipulación, y ofrece un modo **watch** en tiempo real. Huellas SHA-256 + comparación de conjuntos, como Tripwire o AIDE — más el blindaje que necesitan para ser confiables.
+Herramienta de monitoreo de integridad de archivos (FIM). Registra una línea de base de hashes y permisos de un directorio y, en ejecuciones posteriores, reporta los archivos modificados, con permisos cambiados, nuevos o eliminados. La línea de base puede firmarse para detectar manipulación.
 
-## Qué hace
-Construye una línea de base (cada archivo → hash + permisos). En ejecuciones posteriores re-escanea y clasifica cada diferencia como **modificado**, **permiso cambiado**, **nuevo** o **eliminado**. La base puede firmarse con HMAC, y `watch` reporta cambios apenas ocurren.
+## Características
 
-## Cómo funciona (y por qué)
-- **Hashing.** SHA-256 convierte cualquier archivo en una huella de 64 caracteres determinista y resistente a colisiones: cambiás un byte y el hash cambia por completo. Comparar hashes equivale a comparar archivos enteros — rápido y exacto.
-- **Los permisos también importan.** Un atacante puede dejar un config `world-writable` o un script `setuid` **sin cambiar un solo byte del contenido**. Guardar el modo del archivo y marcar los cambios de permisos atrapa esa clase de ataque que un FIM de solo contenido dejaría pasar.
-- **Baseline firmado (la mejora clave).** Un FIM vale lo que vale su línea de base — si un atacante edita `baseline.json` para que coincida con sus archivos manipulados, verías "sin cambios". Con `-k`, la base se firma con **HMAC-SHA256**; al cargarla se recalcula la firma y **se rechaza una base alterada** sin la clave. La verificación usa comparación en tiempo constante.
-- **Detección = comparación de conjuntos.** Archivos en ambos manifiestos con hash distinto son *modificados*; mismo hash pero distinto modo son cambios de *permisos*; solo-en-nuevo son *nuevos*; solo-en-base son *eliminados*.
+- Hashing SHA-256 de todos los archivos de un árbol de directorios.
+- Control de permisos: los cambios de modo se reportan aunque el contenido no cambie.
+- Línea de base firmada con HMAC opcional; cargar una base manipulada falla la verificación.
+- Modo `watch` en tiempo real por polling.
+- Salida en texto plano o JSON para el comando `check`.
 
 ## Uso
 
-Con el toolkit instalado (`pip install -e .`), usá el CLI unificado: `pstk fim ...` equivale a `python3 file_integrity.py ...`.
-
 ```bash
-# crear una línea de base firmada
-pstk fim baseline ./mi_dir -o baseline.json -k "clave-secreta"   # igual que el script de abajo
-python3 file_integrity.py baseline ./mi_dir -o baseline.json -k "clave-secreta"
-
-# más tarde, verificar integridad (chequea también la firma)
-python3 file_integrity.py check ./mi_dir -b baseline.json -k "clave-secreta"
-python3 file_integrity.py --json check ./mi_dir -b baseline.json   # estructurado
-
-# vigilar un directorio en vivo
-python3 file_integrity.py watch ./mi_dir -i 2
+pstk fim baseline ./directorio -o baseline.json -k "clave-secreta"   # mediante el CLI unificado
+python3 file_integrity.py baseline ./directorio -o baseline.json -k "clave-secreta"   # independiente
 ```
 
-## Ejemplo de salida
+```bash
+pstk fim check ./directorio -b baseline.json -k "clave-secreta"
+pstk fim --json check ./directorio -b baseline.json
+pstk fim watch ./directorio -i 2
+```
+
+## Comandos
+
+| Comando | Descripción |
+|---------|-------------|
+| `baseline <dir>` | Crea una línea de base (`-o` ruta de salida, `-k` clave de firma) |
+| `check <dir>` | Compara el estado actual contra una base (`-b` base, `-k` clave) |
+| `watch <dir>` | Monitorea un directorio en tiempo real (`-i` intervalo en segundos) |
+
+Categorías de cambio reportadas por `check`: modificados, permisos, nuevos, eliminados.
+
+## Salida
+
 ```
 MODIFICADOS (1):
   config/app.conf
@@ -96,13 +107,12 @@ NUEVOS (1):
   uploads/shell.php
 ```
 
-## Para qué sirve en seguridad
-Un FIM detecta cambios no autorizados: binarios alterados, webshells subidas, configs manipuladas o un permiso relajado en silencio. Firmar la base cierra el bypass obvio — atacar al propio detector.
+## Consideraciones de seguridad
 
-## Conceptos aplicados
-Hashing criptográfico, firma HMAC (`hmac`), permisos de archivos (`os.stat`), lectura/escritura JSON, recorrido de directorios, polling y comparación de conjuntos.
+Cuando la base se firma con `-k`, cualquier modificación del archivo de base se detecta al cargarlo, lo que impide que un atacante edite la base para ocultar cambios. La comparación de la firma se realiza en tiempo constante.
 
 ## Tests
+
 ```bash
 pytest
 ```

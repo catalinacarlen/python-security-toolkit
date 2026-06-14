@@ -1,120 +1,120 @@
 # Password Toolkit
 
-An auditor for passwords: it measures strength by **real entropy (bits)**, estimates **crack time**, checks the password against **real-world breaches** (Have I Been Pwned, privately), generates secure passwords, and hashes them correctly.
+Password auditing utility. It scores password strength by estimated entropy, estimates crack time, checks a password against known breaches via Have I Been Pwned, generates secure passwords, and computes password hashes.
 
-## What it does
-- **Audit** — one command returns entropy, strength, estimated crack time and breach status.
-- **Strength by entropy** — instead of an arbitrary score, it computes the size of the search space in bits and penalizes weak patterns (common passwords, repeats, keyboard/alphabet sequences).
-- **Breach check (HIBP)** — tells you how many times a password has appeared in known leaks.
-- **Generator** — cryptographically secure, with `secrets`.
-- **Hashing** — `SHA-256` for integrity and **PBKDF2-HMAC-SHA256** (salted, slow) for password storage.
+## Features
 
-## How it works (and why)
-- **Entropy, not vibes.** Strength is estimated as `length × log2(pool)`, where *pool* is the size of the character set used. This is why length matters more than throwing in one symbol: every extra character multiplies the attacker's work. Weak structures (e.g. `password`, `aaa`, `qwerty`, `123456`) get bits subtracted, because a real attacker tries those first.
-- **Crack time.** The bits are translated into an average guessing time at a configurable rate (default 10¹⁰ guesses/sec, a modern GPU against a fast hash). It turns an abstract number into "instant" vs "thousands of centuries".
-- **Breach check via k-anonymity.** The password is hashed with SHA-1 locally and **only the first 5 characters** of that hash are sent to the HIBP range API. The API returns every suffix sharing that prefix and the match is resolved on your machine — **the password never leaves your computer**. With no network it degrades gracefully (returns "not verifiable").
-- **Storage done right.** `SHA-256` is fast, which is exactly what you *don't* want for stored passwords. `derivar()` uses PBKDF2 with a random per-user salt and 200k iterations, and verification uses a constant-time comparison to avoid timing attacks.
+- Strength scoring based on estimated entropy in bits, with penalties for common passwords, repeated characters and keyboard/alphabet sequences.
+- Crack-time estimation at a configurable guess rate.
+- Breach check against Have I Been Pwned using the k-anonymity model: only the first five characters of the SHA-1 hash are sent; the password is never transmitted. Degrades gracefully when offline.
+- Cryptographically secure password generation (`secrets`).
+- Hashing with SHA-256 (integrity) and PBKDF2-HMAC-SHA256 with a per-call random salt (storage), verified in constant time.
+- Plain-text or JSON output.
 
 ## Usage
 
-With the toolkit installed (`pip install -e .`), use the unified CLI: `pstk pwd ...` is equivalent to `python3 password_toolkit.py ...`.
+```bash
+pstk pwd auditar "C0rr3ct-H0rs3_Battery$taple!9"            # via the unified CLI
+python3 password_toolkit.py auditar "C0rr3ct-H0rs3_Battery$taple!9"   # standalone
+```
 
 ```bash
-# full report (entropy + crack time + breach check)
-pstk pwd auditar "C0rr3ct-H0rs3_Battery$taple!9"            # same as the script below
-python3 password_toolkit.py auditar "C0rr3ct-H0rs3_Battery$taple!9"
-python3 password_toolkit.py --json auditar --offline "Abc123!"   # no network
-
-python3 password_toolkit.py evaluar "Abc123!"
-python3 password_toolkit.py generar -l 20
-python3 password_toolkit.py hashear "my-key" --algoritmo pbkdf2
-python3 password_toolkit.py filtrada "password"                  # query HIBP
+pstk pwd --json auditar --offline "example"                 # no network
+pstk pwd evaluar "example"
+pstk pwd generar -l 20
+pstk pwd hashear "input" --algoritmo pbkdf2
+pstk pwd filtrada "password"                                # queries HIBP (requires network)
 ```
 
-## Example output
+## Subcommands
+
+| Subcommand | Description |
+|------------|-------------|
+| `auditar` | Combined report: entropy, strength, crack time, breach status (`--offline` skips HIBP) |
+| `evaluar` | Strength and entropy only |
+| `generar` | Generate a secure password (`-l` length) |
+| `hashear` | Hash a value (`--algoritmo sha256|pbkdf2`, `--salt`) |
+| `filtrada` | Breach check against HIBP |
+
+The global `--json` flag applies to all subcommands.
+
+## Output
+
 ```
-$ password_toolkit.py evaluar "C0rr3ct-H0rs3_Battery$taple!9"
+$ pstk pwd evaluar "C0rr3ct-H0rs3_Battery$taple!9"
 Fortaleza: Muy fuerte (4/4) — 190.1 bits — crackeo: miles de siglos
-
-$ password_toolkit.py --json auditar --offline "password"
-{
-  "longitud": 8,
-  "entropia_bits": 17.6,
-  "fortaleza": "Muy débil",
-  "tiempo_crackeo_estimado": "instantáneo",
-  ...
-}
 ```
 
-## Security note
-`SHA-256` is for integrity, **not** password storage. For storage use slow, salted algorithms — PBKDF2 (shown here, stdlib) or, better still, **bcrypt, scrypt or Argon2**.
+## Security considerations
 
-## Concepts applied
-Strings, functions, decision structures, modules (`secrets`, `hashlib`, `urllib`), entropy/`math`, and safe network handling. Tests mock the network so they run offline.
+SHA-256 is suitable for integrity verification, not for password storage. For storage, use a slow, salted algorithm such as PBKDF2 (provided here), or bcrypt, scrypt or Argon2.
 
-## Tests
+## Testing
+
 ```bash
 pytest
 ```
+
+Network access to HIBP is mocked in the test suite, so tests run offline.
 
 ---
 ---
 
 # Password Toolkit (ES)
 
-Un auditor de contraseñas: mide la fortaleza por **entropía real (bits)**, estima el **tiempo de crackeo**, verifica la contraseña contra **filtraciones reales** (Have I Been Pwned, de forma privada), genera contraseñas seguras y las hashea como corresponde.
+Utilidad de auditoría de contraseñas. Evalúa la fortaleza por entropía estimada, estima el tiempo de crackeo, verifica una contraseña contra filtraciones conocidas mediante Have I Been Pwned, genera contraseñas seguras y calcula hashes de contraseñas.
 
-## Qué hace
-- **Auditar** — un solo comando devuelve entropía, fortaleza, tiempo de crackeo estimado y estado de filtración.
-- **Fortaleza por entropía** — en vez de un puntaje arbitrario, calcula el tamaño del espacio de búsqueda en bits y penaliza patrones débiles (contraseñas comunes, repeticiones, secuencias de teclado/alfabeto).
-- **Chequeo de filtración (HIBP)** — te dice cuántas veces apareció la contraseña en brechas conocidas.
-- **Generador** — criptográficamente seguro, con `secrets`.
-- **Hashing** — `SHA-256` para integridad y **PBKDF2-HMAC-SHA256** (con salt, lento) para almacenamiento de contraseñas.
+## Características
 
-## Cómo funciona (y por qué)
-- **Entropía, no intuición.** La fortaleza se estima como `longitud × log2(pool)`, donde *pool* es el tamaño del conjunto de caracteres usado. Por eso la longitud pesa más que meter un símbolo suelto: cada carácter extra multiplica el trabajo del atacante. Las estructuras débiles (`password`, `aaa`, `qwerty`, `123456`) restan bits, porque un atacante real las prueba primero.
-- **Tiempo de crackeo.** Los bits se traducen a un tiempo medio de adivinanza a una tasa configurable (por defecto 10¹⁰ intentos/seg, una GPU moderna contra un hash rápido). Convierte un número abstracto en "instantáneo" vs "miles de siglos".
-- **Chequeo por k-anonymity.** La contraseña se hashea con SHA-1 localmente y **solo se envían los 5 primeros caracteres** de ese hash a la API de rangos de HIBP. La API devuelve todos los sufijos que comparten ese prefijo y la coincidencia se resuelve en tu equipo — **la contraseña nunca sale de tu computadora**. Sin red, degrada con elegancia (devuelve "no verificable").
-- **Almacenamiento bien hecho.** `SHA-256` es rápido, justo lo que *no* querés para contraseñas guardadas. `derivar()` usa PBKDF2 con salt aleatorio por usuario y 200k iteraciones, y la verificación usa comparación en tiempo constante para evitar ataques de temporización.
+- Evaluación de fortaleza basada en entropía estimada en bits, con penalizaciones por contraseñas comunes, caracteres repetidos y secuencias de teclado/alfabeto.
+- Estimación del tiempo de crackeo a una tasa de adivinanzas configurable.
+- Verificación contra Have I Been Pwned mediante el modelo de k-anonymity: solo se envían los primeros cinco caracteres del hash SHA-1; la contraseña nunca se transmite. Degrada con elegancia sin conexión.
+- Generación de contraseñas criptográficamente segura (`secrets`).
+- Hashing con SHA-256 (integridad) y PBKDF2-HMAC-SHA256 con salt aleatorio por llamada (almacenamiento), verificado en tiempo constante.
+- Salida en texto plano o JSON.
 
 ## Uso
 
-Con el toolkit instalado (`pip install -e .`), usá el CLI unificado: `pstk pwd ...` equivale a `python3 password_toolkit.py ...`.
+```bash
+pstk pwd auditar "C0rr3ct-H0rs3_Battery$taple!9"            # mediante el CLI unificado
+python3 password_toolkit.py auditar "C0rr3ct-H0rs3_Battery$taple!9"   # script independiente
+```
 
 ```bash
-# reporte completo (entropía + crack time + filtraciones)
-pstk pwd auditar "C0rr3ct-H0rs3_Battery$taple!9"            # igual que el script de abajo
-python3 password_toolkit.py auditar "C0rr3ct-H0rs3_Battery$taple!9"
-python3 password_toolkit.py --json auditar --offline "Abc123!"   # sin red
-
-python3 password_toolkit.py evaluar "Abc123!"
-python3 password_toolkit.py generar -l 20
-python3 password_toolkit.py hashear "mi-clave" --algoritmo pbkdf2
-python3 password_toolkit.py filtrada "password"                  # consulta HIBP
+pstk pwd --json auditar --offline "ejemplo"                 # sin red
+pstk pwd evaluar "ejemplo"
+pstk pwd generar -l 20
+pstk pwd hashear "entrada" --algoritmo pbkdf2
+pstk pwd filtrada "password"                                # consulta HIBP (requiere red)
 ```
 
-## Ejemplo de salida
+## Subcomandos
+
+| Subcomando | Descripción |
+|------------|-------------|
+| `auditar` | Reporte combinado: entropía, fortaleza, tiempo de crackeo, estado de filtración (`--offline` omite HIBP) |
+| `evaluar` | Solo fortaleza y entropía |
+| `generar` | Genera una contraseña segura (`-l` longitud) |
+| `hashear` | Hashea un valor (`--algoritmo sha256|pbkdf2`, `--salt`) |
+| `filtrada` | Verificación contra HIBP |
+
+El flag global `--json` aplica a todos los subcomandos.
+
+## Salida
+
 ```
-$ password_toolkit.py evaluar "C0rr3ct-H0rs3_Battery$taple!9"
+$ pstk pwd evaluar "C0rr3ct-H0rs3_Battery$taple!9"
 Fortaleza: Muy fuerte (4/4) — 190.1 bits — crackeo: miles de siglos
-
-$ password_toolkit.py --json auditar --offline "password"
-{
-  "longitud": 8,
-  "entropia_bits": 17.6,
-  "fortaleza": "Muy débil",
-  "tiempo_crackeo_estimado": "instantáneo",
-  ...
-}
 ```
 
-## Nota de seguridad
-`SHA-256` es para integridad, **no** para guardar contraseñas. Para almacenar, usá algoritmos lentos y con *salt* — PBKDF2 (mostrado acá, stdlib) o, mejor aún, **bcrypt, scrypt o Argon2**.
+## Consideraciones de seguridad
 
-## Conceptos aplicados
-Strings, funciones, estructuras de decisión, módulos (`secrets`, `hashlib`, `urllib`), entropía/`math` y manejo seguro de red. Los tests mockean la red para correr offline.
+SHA-256 es adecuado para verificar integridad, no para almacenar contraseñas. Para almacenamiento, utilice un algoritmo lento y con salt como PBKDF2 (provisto aquí), o bcrypt, scrypt o Argon2.
 
 ## Tests
+
 ```bash
 pytest
 ```
+
+El acceso de red a HIBP está mockeado en la batería de tests, por lo que los tests corren sin conexión.

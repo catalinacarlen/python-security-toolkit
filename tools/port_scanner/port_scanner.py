@@ -5,8 +5,7 @@ intenta leer el **banner** que el servicio anuncia al conectarse. A partir de es
 banner (y del puerto) infiere qué servicio corre realmente, no solo el nombre
 "de catálogo" del puerto. Incluye control de concurrencia y de rate, y salida JSON.
 
-Pensado con fines educativos y de auditoría sobre sistemas propios o con
-autorización explícita. Solo librería estándar.
+Para uso sobre sistemas propios o con autorización explícita. Solo librería estándar.
 """
 
 from __future__ import annotations

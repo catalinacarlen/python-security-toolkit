@@ -1,30 +1,44 @@
 # Port Scanner
 
-Concurrent TCP port scanner with **banner grabbing** and **service fingerprinting**. It doesn't just say "port 22 is open" — it reads what the service announces and tells you what's *actually* running, with rate/concurrency control and JSON output.
+Concurrent TCP port scanner with banner grabbing and service fingerprinting. For each open port it attempts to read the service banner and identifies the service from that banner, with fallback to the well-known port mapping.
 
-## What it does
-Given a host and a port range, it reports open ports, grabs each service's banner, infers the real service from that banner (falling back to the well-known port name), and can emit everything as JSON.
+## Features
 
-## How it works (and why)
-- **Open detection.** TCP starts with a three-way handshake (SYN → SYN-ACK → ACK). `connect_ex()` returns `0` only when the handshake completes, i.e. a service is listening.
-- **Banner grabbing.** Many services greet you the moment you connect (SSH, FTP, SMTP). The scanner reads that greeting; for silent ones like HTTP it sends a tiny `HEAD` request and reads the reply. The banner is what reveals *versions* — and versions are what map to known CVEs.
-- **Fingerprinting over port numbers.** The port number is only a convention; anyone can run SSH on 40000. So the service is inferred from the **banner signature first** (`SSH-2.0…`, `220 …FTP`, `HTTP/1.1…`) and only falls back to the port-name table when there's no banner. That's the difference between guessing and identifying.
-- **Rate and concurrency.** Scanning is I/O-bound (mostly waiting on the network), so a thread pool (`-W`) speeds it up massively. A `-d` delay throttles banner grabs to stay quiet and avoid tripping defenses.
+- Concurrent scanning of a configurable port range via a thread pool.
+- Banner grabbing on open ports, including an HTTP probe for services that do not greet on connect.
+- Service identification from the banner signature, independent of the port number.
+- Configurable concurrency and inter-banner delay (rate limiting).
+- Plain-text or JSON output.
 
 ## Usage
 
-With the toolkit installed (`pip install -e .`), use the unified CLI: `pstk scan ...` is equivalent to `python3 port_scanner.py ...`.
-
 ```bash
-pstk scan 127.0.0.1                                # same as the script below
-python3 port_scanner.py 127.0.0.1                  # ports 1-1024, with banners
-python3 port_scanner.py scanme.nmap.org -s 20 -e 100 -t 1.0
-python3 port_scanner.py 10.0.0.5 -W 200 -d 0.1     # 200 workers, 0.1s throttle
-python3 port_scanner.py 10.0.0.5 --no-banner       # fast: open/closed only
-python3 port_scanner.py 10.0.0.5 --json            # structured output
+pstk scan 127.0.0.1                                # via the unified CLI
+python3 port_scanner.py 127.0.0.1                  # as a standalone script
 ```
 
-## Example output
+```bash
+pstk scan scanme.nmap.org -s 20 -e 100 -t 1.0
+pstk scan 10.0.0.5 -W 200 -d 0.1                   # 200 workers, 0.1s delay
+pstk scan 10.0.0.5 --no-banner                     # open/closed only
+pstk scan 10.0.0.5 --json
+```
+
+## Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `host` | Target host or IP | — |
+| `-s`, `--start` | First port | 1 |
+| `-e`, `--end` | Last port | 1024 |
+| `-t`, `--timeout` | Per-port timeout (seconds) | 0.5 |
+| `-W`, `--workers` | Concurrent threads | 100 |
+| `-d`, `--delay` | Delay between banner grabs (seconds) | 0.0 |
+| `--no-banner` | Skip banner grabbing | off |
+| `--json` | JSON output | off |
+
+## Output
+
 ```
 Puertos abiertos en 127.0.0.1 (2):
 
@@ -32,16 +46,12 @@ Puertos abiertos en 127.0.0.1 (2):
     443/tcp  HTTPS
 ```
 
-## Security relevance
-Mapping exposed services is the first step of any audit or recon (the *Identify* function of NIST CSF). The banner often leaks the software **version**, which is what turns "a port is open" into "this exact version has a known vulnerability".
+## Security considerations
 
-## Concepts applied
-Sockets, banner grabbing, regular expressions, thread pools (`ThreadPoolExecutor`), rate limiting and JSON output.
+A service banner frequently exposes the software version, which can be correlated with known vulnerabilities. Scan only systems you own or are explicitly authorized to test; scanning third-party infrastructure without permission may be unlawful.
 
-## Ethical notice
-Use **only** on systems you own or have written authorization to test. Scanning third-party infrastructure without permission may be illegal.
+## Testing
 
-## Tests
 ```bash
 pytest
 ```
@@ -51,31 +61,45 @@ pytest
 
 # Port Scanner (ES)
 
-Escáner de puertos TCP concurrente con **banner grabbing** y **fingerprinting de servicio**. No se queda en "el puerto 22 está abierto": lee lo que el servicio anuncia y te dice qué corre *de verdad*, con control de rate/concurrencia y salida JSON.
+Escáner de puertos TCP concurrente con banner grabbing y fingerprinting de servicio. Por cada puerto abierto intenta leer el banner del servicio e identifica el servicio a partir de ese banner, con respaldo en el mapeo de puertos conocidos.
 
-## Qué hace
-Dado un host y un rango de puertos, informa los puertos abiertos, captura el banner de cada servicio, infiere el servicio real a partir de ese banner (y cae al nombre del puerto conocido si no hay banner), y puede emitir todo como JSON.
+## Características
 
-## Cómo funciona (y por qué)
-- **Detección de abierto.** TCP arranca con un saludo de tres vías (SYN → SYN-ACK → ACK). `connect_ex()` devuelve `0` solo cuando el saludo se completa, es decir, hay un servicio escuchando.
-- **Banner grabbing.** Muchos servicios te saludan apenas te conectás (SSH, FTP, SMTP). El escáner lee ese saludo; para los mudos como HTTP envía un pequeño `HEAD` y lee la respuesta. El banner es lo que revela *versiones* — y las versiones son las que se mapean a CVEs conocidas.
-- **Fingerprinting por encima del número de puerto.** El número de puerto es solo una convención; cualquiera puede correr SSH en el 40000. Por eso el servicio se infiere **primero por la firma del banner** (`SSH-2.0…`, `220 …FTP`, `HTTP/1.1…`) y solo cae a la tabla de puertos cuando no hay banner. Esa es la diferencia entre adivinar e identificar.
-- **Rate y concurrencia.** El escaneo está limitado por E/S (casi todo es esperar la red), así que un pool de hilos (`-W`) lo acelera muchísimo. Un retardo `-d` modera los banners para ser más sigiloso y no disparar defensas.
+- Escaneo concurrente de un rango de puertos configurable mediante un pool de hilos.
+- Banner grabbing en puertos abiertos, incluido un sondeo HTTP para servicios que no saludan al conectar.
+- Identificación del servicio por la firma del banner, independiente del número de puerto.
+- Concurrencia y retardo entre banners configurables (limitación de rate).
+- Salida en texto plano o JSON.
 
 ## Uso
 
-Con el toolkit instalado (`pip install -e .`), usá el CLI unificado: `pstk scan ...` equivale a `python3 port_scanner.py ...`.
-
 ```bash
-pstk scan 127.0.0.1                                # igual que el script de abajo
-python3 port_scanner.py 127.0.0.1                  # puertos 1-1024, con banners
-python3 port_scanner.py scanme.nmap.org -s 20 -e 100 -t 1.0
-python3 port_scanner.py 10.0.0.5 -W 200 -d 0.1     # 200 hilos, 0.1s de retardo
-python3 port_scanner.py 10.0.0.5 --no-banner       # rápido: solo abierto/cerrado
-python3 port_scanner.py 10.0.0.5 --json            # salida estructurada
+pstk scan 127.0.0.1                                # mediante el CLI unificado
+python3 port_scanner.py 127.0.0.1                  # como script independiente
 ```
 
-## Ejemplo de salida
+```bash
+pstk scan scanme.nmap.org -s 20 -e 100 -t 1.0
+pstk scan 10.0.0.5 -W 200 -d 0.1                   # 200 hilos, 0.1s de retardo
+pstk scan 10.0.0.5 --no-banner                     # solo abierto/cerrado
+pstk scan 10.0.0.5 --json
+```
+
+## Opciones
+
+| Opción | Descripción | Por defecto |
+|--------|-------------|-------------|
+| `host` | Host o IP objetivo | — |
+| `-s`, `--start` | Puerto inicial | 1 |
+| `-e`, `--end` | Puerto final | 1024 |
+| `-t`, `--timeout` | Timeout por puerto (segundos) | 0.5 |
+| `-W`, `--workers` | Hilos concurrentes | 100 |
+| `-d`, `--delay` | Retardo entre banners (segundos) | 0.0 |
+| `--no-banner` | Omitir banner grabbing | off |
+| `--json` | Salida JSON | off |
+
+## Salida
+
 ```
 Puertos abiertos en 127.0.0.1 (2):
 
@@ -83,16 +107,12 @@ Puertos abiertos en 127.0.0.1 (2):
     443/tcp  HTTPS
 ```
 
-## Para qué sirve en seguridad
-Mapear los servicios expuestos es el primer paso de cualquier auditoría o reconocimiento (la fase *Identificar* del NIST CSF). El banner suele filtrar la **versión** del software, que es lo que convierte "hay un puerto abierto" en "esta versión exacta tiene una vulnerabilidad conocida".
+## Consideraciones de seguridad
 
-## Conceptos aplicados
-Sockets, banner grabbing, expresiones regulares, pools de hilos (`ThreadPoolExecutor`), limitación de rate y salida JSON.
-
-## Aviso ético
-Usar **solo** sobre sistemas propios o con autorización escrita. Escanear infraestructura ajena sin permiso puede ser ilegal.
+El banner de un servicio suele exponer la versión del software, que puede correlacionarse con vulnerabilidades conocidas. Escanee únicamente sistemas propios o sobre los que tenga autorización explícita; escanear infraestructura de terceros sin permiso puede ser ilegal.
 
 ## Tests
+
 ```bash
 pytest
 ```
