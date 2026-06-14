@@ -157,3 +157,32 @@ def test_aleatoria_larga_se_mantiene_fuerte() -> None:
 
 def test_anio_embebido_penaliza() -> None:
     assert entropia_bits("MNbVcXz2001") < entropia_bits("MNbVcXzqplm")
+
+
+def test_palabra_embebida_del_diccionario_es_debil() -> None:
+    # 'catalina' y 'juan' están en la lista curada.
+    assert evaluar_fortaleza("Catalina123")[0] <= 1
+    assert evaluar_fortaleza("juan1985")[0] <= 1
+
+
+# --- Entrada segura y wordlist externa --------------------------------------
+
+def test_resolver_password_pide_sin_eco_si_falta(monkeypatch) -> None:
+    import password_toolkit as p
+    monkeypatch.setattr(p.getpass, "getpass", lambda *a, **k: "desde-getpass")
+    assert p._resolver_password(None) == "desde-getpass"
+    assert p._resolver_password("dada") == "dada"
+
+
+def test_wordlist_externa_amplia_el_diccionario(tmp_path, monkeypatch) -> None:
+    import password_toolkit as p
+    wl = tmp_path / "wl.txt"
+    wl.write_text("supersecretosolomio\n")
+    # sin la wordlist, es fuerte; con ella, la palabra embebida la vuelve débil.
+    assert evaluar_fortaleza("Supersecretosolomio99")[0] >= 3
+    monkeypatch.setenv("PSTK_WORDLIST", str(wl))
+    p._diccionario.cache_clear()
+    try:
+        assert evaluar_fortaleza("Supersecretosolomio99")[0] <= 1
+    finally:
+        p._diccionario.cache_clear()

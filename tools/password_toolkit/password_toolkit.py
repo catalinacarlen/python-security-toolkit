@@ -1,8 +1,10 @@
 """Kit de contraseñas: fortaleza por entropía, generación segura, hashing y breach-check.
 
 Capacidades:
-- Fortaleza basada en **entropía real (bits)** y penalizaciones por patrones débiles
-  (repeticiones, secuencias, contraseñas comunes), no en una heurística arbitraria.
+- Fortaleza por **entropía (bits)** combinando el límite por pool de caracteres con
+  una estimación estructural basada en un **diccionario** de tokens débiles
+  (contraseñas, nombres y palabras comunes), con normalización leet y detección de
+  años. El diccionario es ampliable con una wordlist externa (PSTK_WORDLIST).
 - Estimación del **tiempo de crackeo** a una tasa de adivinanzas configurable.
 - **Generador criptográficamente seguro** con el módulo `secrets`.
 - **Verificación contra filtraciones** vía Have I Been Pwned usando el modelo de
@@ -12,18 +14,26 @@ Capacidades:
 - **Hashing**: SHA-256 (integridad) y PBKDF2-HMAC-SHA256 con salt (almacenamiento
   de contraseñas hecho como corresponde).
 
+Manejo de la contraseña: si no se pasa por argumento, se solicita sin eco con
+`getpass`. La contraseña no se escribe en disco ni en logs; solo se usa en memoria.
+
 Solo librería estándar. Para uso en entornos autorizados.
 """
 
 from __future__ import annotations
 
 import argparse
+import getpass
+import gzip
 import hashlib
 import json
 import math
+import os
 import re
 import secrets
 import string
+from functools import lru_cache
+from pathlib import Path
 from urllib import error, request
 
 NIVELES = {0: "Muy débil", 1: "Débil", 2: "Aceptable", 3: "Fuerte", 4: "Muy fuerte"}
@@ -79,8 +89,68 @@ def _tamano_alfabeto(password: str) -> int:
 
 
 def _normalizar(texto: str) -> str:
-    """Pasa a minúsculas y revierte sustituciones leet para comparar contra DEBILES."""
+    """Pasa a minúsculas y revierte sustituciones leet para comparar contra el diccionario."""
     return texto.lower().translate(_LEET)
+
+
+_DIR_DATOS = Path(__file__).resolve().parent / "data"
+
+
+def _leer_wordlist(ruta: Path) -> set[str]:
+    """Lee una wordlist (.txt o .gz), una entrada por línea, normalizada."""
+    abrir = gzip.open if str(ruta).endswith(".gz") else open
+    try:
+        with abrir(ruta, "rt", encoding="utf-8", errors="ignore") as archivo:
+            return {
+                _normalizar(linea.strip())
+                for linea in archivo
+                if linea.strip() and not linea.startswith("#")
+            }
+    except OSError:
+        return set()
+
+
+@lru_cache(maxsize=1)
+def _diccionario() -> frozenset:
+    """Diccionario de tokens débiles, cargado una sola vez (carga perezosa).
+
+    Combina la lista base embebida (DEBILES), el archivo curado `data/common_passwords.txt`
+    si existe, y una wordlist externa indicada por la variable de entorno PSTK_WORDLIST
+    (útil para apuntar a un diccionario grande como rockyou). Acepta .txt o .gz.
+    """
+    palabras = set(DEBILES)
+    por_defecto = _DIR_DATOS / "common_passwords.txt"
+    if por_defecto.exists():
+        palabras |= _leer_wordlist(por_defecto)
+    externa = os.environ.get("PSTK_WORDLIST")
+    if externa:
+        palabras |= _leer_wordlist(Path(externa))
+    return frozenset(p for p in palabras if len(p) >= 3)
+
+
+def _palabras_embebidas(normalizado: str, largo_min: int = 4) -> list[tuple[int, int]]:
+    """Devuelve rangos [inicio, fin) de palabras del diccionario embebidas, sin solaparse.
+
+    Estrategia voraz: prioriza las coincidencias más largas. Como la contraseña es corta,
+    el barrido de subcadenas contra el set es barato.
+    """
+    dic = _diccionario()
+    n = len(normalizado)
+    encontradas: list[tuple[int, int, int]] = []
+    for i in range(n):
+        for j in range(n, i + largo_min - 1, -1):
+            if normalizado[i:j] in dic:
+                encontradas.append((j - i, i, j))
+                break
+    encontradas.sort(reverse=True)
+    rangos: list[tuple[int, int]] = []
+    ocupado = [False] * n
+    for _largo, i, j in encontradas:
+        if not any(ocupado[i:j]):
+            for k in range(i, j):
+                ocupado[k] = True
+            rangos.append((i, j))
+    return rangos
 
 
 def _tiene_secuencia(password: str, largo: int = 4) -> bool:
@@ -95,27 +165,34 @@ def _tiene_secuencia(password: str, largo: int = 4) -> bool:
 
 
 def _entropia_estructural(password: str) -> float | None:
-    """Estima la entropía si la contraseña es "palabra débil + adornos".
+    """Estima la entropía si la contraseña contiene palabras de diccionario.
 
-    Aísla el núcleo alfabético (quitando dígitos/símbolos de los extremos) y, si ese
-    núcleo es una palabra/nombre conocido, modela la contraseña como un patrón humano:
-    una palabra de diccionario (~14 bits) más adornos predecibles (años, símbolos al
-    final). Devuelve esa estimación, o None si no reconoce el patrón.
+    Detecta palabras/nombres del diccionario embebidas en la contraseña (con
+    normalización leet) y modela cada una como un patrón humano de ~14 bits, en lugar
+    de su entropía aleatoria. El resto de los caracteres (letras sueltas, dígitos,
+    símbolos) aporta su propia entropía. Devuelve la estimación, o None si no hay
+    ninguna palabra reconocida.
     """
-    nucleo = re.sub(r"^[^A-Za-zÀ-ÿ]+|[^A-Za-zÀ-ÿ]+$", "", password)
-    if len(nucleo) < 3 or _normalizar(nucleo) not in DEBILES:
+    normalizado = _normalizar(password)
+    rangos = _palabras_embebidas(normalizado)
+    if not rangos:
         return None
 
-    bits = 14.0                                   # palabra de un diccionario común
-    if nucleo != nucleo.lower():                  # mayúsculas: ~1 bit, no log2(52)
-        bits += 1.0
+    cubierto = [False] * len(password)
+    bits = 0.0
+    for inicio, fin in rangos:
+        bits += 14.0                              # palabra de un diccionario común
+        for k in range(inicio, fin):
+            cubierto[k] = True
+        if any(password[k].isupper() for k in range(inicio, fin)):
+            bits += 1.0                           # variación de mayúsculas: ~1 bit
 
-    idx = password.lower().find(nucleo.lower())
-    adornos = password[:idx] + password[idx + len(nucleo):]
-    for run in re.findall(r"\d+", adornos):       # dígitos: suelen ser años/fechas
+    resto = "".join(c for k, c in enumerate(password) if not cubierto[k])
+    for run in re.findall(r"\d+", resto):         # dígitos: suelen ser años/fechas
         bits += min(len(run) * math.log2(10), 10.0)
-    bits += sum(2.0 for c in adornos if c in string.punctuation)  # símbolos predecibles
-    bits += sum(1.0 for c in adornos if c == " ")
+    bits += sum(math.log2(26) for c in resto if c.isalpha())      # letras sueltas
+    bits += sum(2.0 for c in resto if c in string.punctuation)    # símbolos
+    bits += sum(1.0 for c in resto if c == " ")
     return bits
 
 
@@ -294,29 +371,42 @@ def auditar(password: str, offline: bool = False) -> dict:
     }
 
 
+_AYUDA_PWD = ("Contraseña. Si se omite, se solicita de forma segura (sin eco). "
+              "Pasarla como argumento es inseguro: queda en el historial del shell.")
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Kit de contraseñas: auditar, evaluar, generar, hashear.")
     parser.add_argument("--json", action="store_true", help="Salida en formato JSON")
+    parser.add_argument("--wordlist", default=None,
+                        help="Wordlist externa (.txt o .gz) para ampliar el diccionario de débiles")
     sub = parser.add_subparsers(dest="accion", required=True)
 
     p_aud = sub.add_parser("auditar", help="Reporte completo: entropía, crack-time y filtraciones (HIBP)")
-    p_aud.add_argument("password")
+    p_aud.add_argument("password", nargs="?", help=_AYUDA_PWD)
     p_aud.add_argument("--offline", action="store_true", help="No consultar HIBP (sin red)")
 
     p_eval = sub.add_parser("evaluar", help="Evalúa la fortaleza por entropía")
-    p_eval.add_argument("password")
+    p_eval.add_argument("password", nargs="?", help=_AYUDA_PWD)
 
     p_gen = sub.add_parser("generar", help="Genera una contraseña segura")
     p_gen.add_argument("-l", "--longitud", type=int, default=16)
 
     p_hash = sub.add_parser("hashear", help="Calcula el hash (sha256 o pbkdf2)")
-    p_hash.add_argument("password")
+    p_hash.add_argument("password", nargs="?", help=_AYUDA_PWD)
     p_hash.add_argument("--salt", default=None)
     p_hash.add_argument("--algoritmo", choices=["sha256", "pbkdf2"], default="sha256")
 
     p_pwned = sub.add_parser("filtrada", help="Verifica la contraseña contra HIBP (k-anonymity)")
-    p_pwned.add_argument("password")
+    p_pwned.add_argument("password", nargs="?", help=_AYUDA_PWD)
     return parser.parse_args()
+
+
+def _resolver_password(valor: str | None) -> str:
+    """Devuelve la contraseña dada por argumento o, si falta, la pide sin eco."""
+    if valor is not None:
+        return valor
+    return getpass.getpass("Contraseña: ")
 
 
 def _imprimir(datos: dict, como_json: bool) -> None:
@@ -329,11 +419,15 @@ def _imprimir(datos: dict, como_json: bool) -> None:
 
 def main() -> None:
     args = _parse_args()
+    if args.wordlist:                              # apuntar a un diccionario externo
+        os.environ["PSTK_WORDLIST"] = args.wordlist
+        _diccionario.cache_clear()
     if args.accion == "auditar":
-        _imprimir(auditar(args.password, offline=args.offline), args.json)
+        _imprimir(auditar(_resolver_password(args.password), offline=args.offline), args.json)
     elif args.accion == "evaluar":
-        puntaje, etiqueta = evaluar_fortaleza(args.password)
-        bits = entropia_bits(args.password)
+        password = _resolver_password(args.password)
+        puntaje, etiqueta = evaluar_fortaleza(password)
+        bits = entropia_bits(password)
         if args.json:
             _imprimir({"fortaleza": etiqueta, "puntaje": puntaje, "entropia_bits": round(bits, 1),
                        "tiempo_crackeo_estimado": tiempo_crackeo(bits)}, True)
@@ -343,10 +437,11 @@ def main() -> None:
         pwd = generar_password(args.longitud)
         _imprimir({"password": pwd}, True) if args.json else print(pwd)
     elif args.accion == "hashear":
-        valor = derivar(args.password) if args.algoritmo == "pbkdf2" else hashear(args.password, args.salt)
+        password = _resolver_password(args.password)
+        valor = derivar(password) if args.algoritmo == "pbkdf2" else hashear(password, args.salt)
         _imprimir({"algoritmo": args.algoritmo, "hash": valor}, True) if args.json else print(valor)
     elif args.accion == "filtrada":
-        n = verificar_filtrada(args.password)
+        n = verificar_filtrada(_resolver_password(args.password))
         if n is None:
             datos: dict[str, object] = {"estado": "no verificable (sin red)"}
         elif n == 0:

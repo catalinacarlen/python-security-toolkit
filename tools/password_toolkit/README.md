@@ -11,20 +11,36 @@ Password auditing utility. It scores password strength by estimated entropy, est
 - Hashing with SHA-256 (integrity) and PBKDF2-HMAC-SHA256 with a per-call random salt (storage), verified in constant time.
 - Plain-text or JSON output.
 
+## Input handling
+
+If the password is omitted, it is requested without echo via `getpass`. Passing it as a
+command-line argument is insecure (it is recorded in the shell history and visible in the
+process list). The password is never written to disk or logs.
+
+```bash
+pstk pwd auditar                  # prompts: "Contraseña:" (no echo, recommended)
+pstk pwd auditar 'example'        # explicit argument (insecure; use single quotes)
+```
+
 ## Usage
 
 ```bash
-pstk pwd auditar "C0rr3ct-H0rs3_Battery$taple!9"            # via the unified CLI
-python3 password_toolkit.py auditar "C0rr3ct-H0rs3_Battery$taple!9"   # standalone
+pstk pwd auditar 'C0rr3ct-H0rs3_Battery$taple!9'            # via the unified CLI
+python3 password_toolkit.py auditar 'C0rr3ct-H0rs3_Battery$taple!9'   # standalone
 ```
 
 ```bash
-pstk pwd --json auditar --offline "example"                 # no network
-pstk pwd evaluar "example"
+pstk pwd --json auditar --offline 'example'                 # no network
+pstk pwd evaluar 'example'
 pstk pwd generar -l 20
-pstk pwd hashear "input" --algoritmo pbkdf2
-pstk pwd filtrada "password"                                # queries HIBP (requires network)
+pstk pwd hashear 'input' --algoritmo pbkdf2
+pstk pwd filtrada 'password'                                # queries HIBP (requires network)
+pstk pwd --wordlist rockyou.txt evaluar 'example'           # use an external dictionary
 ```
+
+The weak-token dictionary can be extended with an external wordlist (`.txt` or `.gz`) via
+`--wordlist` or the `PSTK_WORDLIST` environment variable, for auditing against a large list
+such as rockyou without bundling it in the repository.
 
 ## Subcommands
 
@@ -73,20 +89,36 @@ Utilidad de auditoría de contraseñas. Evalúa la fortaleza por entropía estim
 - Hashing con SHA-256 (integridad) y PBKDF2-HMAC-SHA256 con salt aleatorio por llamada (almacenamiento), verificado en tiempo constante.
 - Salida en texto plano o JSON.
 
+## Manejo de la entrada
+
+Si se omite la contraseña, se solicita sin eco mediante `getpass`. Pasarla como argumento
+es inseguro (queda en el historial del shell y es visible en la lista de procesos). La
+contraseña nunca se escribe en disco ni en logs.
+
+```bash
+pstk pwd auditar                  # pide: "Contraseña:" (sin eco, recomendado)
+pstk pwd auditar 'ejemplo'        # argumento explícito (inseguro; usar comillas simples)
+```
+
 ## Uso
 
 ```bash
-pstk pwd auditar "C0rr3ct-H0rs3_Battery$taple!9"            # mediante el CLI unificado
-python3 password_toolkit.py auditar "C0rr3ct-H0rs3_Battery$taple!9"   # script independiente
+pstk pwd auditar 'C0rr3ct-H0rs3_Battery$taple!9'            # mediante el CLI unificado
+python3 password_toolkit.py auditar 'C0rr3ct-H0rs3_Battery$taple!9'   # script independiente
 ```
 
 ```bash
-pstk pwd --json auditar --offline "ejemplo"                 # sin red
-pstk pwd evaluar "ejemplo"
+pstk pwd --json auditar --offline 'ejemplo'                 # sin red
+pstk pwd evaluar 'ejemplo'
 pstk pwd generar -l 20
-pstk pwd hashear "entrada" --algoritmo pbkdf2
-pstk pwd filtrada "password"                                # consulta HIBP (requiere red)
+pstk pwd hashear 'entrada' --algoritmo pbkdf2
+pstk pwd filtrada 'password'                                # consulta HIBP (requiere red)
+pstk pwd --wordlist rockyou.txt evaluar 'ejemplo'           # usar un diccionario externo
 ```
+
+El diccionario de tokens débiles se puede ampliar con una wordlist externa (`.txt` o `.gz`)
+mediante `--wordlist` o la variable de entorno `PSTK_WORDLIST`, para auditar contra una lista
+grande como rockyou sin incluirla en el repositorio.
 
 ## Subcomandos
 

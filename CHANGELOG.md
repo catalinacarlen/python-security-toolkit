@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [0.3.0] — 2026-06-14
 
+### Added
+
+- **password_toolkit:** secure password input via `getpass` when the password is omitted
+  (the password is no longer required on the command line, where it would be exposed in
+  shell history and the process list); the password is never written to disk or logs.
+- **password_toolkit:** dictionary-based weak-token detection with a curated bundled list
+  (`data/common_passwords.txt`) and support for an external wordlist (`.txt` or `.gz`) via
+  `--wordlist` or the `PSTK_WORDLIST` environment variable; embedded dictionary words are
+  detected, not only exact matches.
+
 ### Changed
 
 - **password_toolkit:** the entropy estimator now combines the character-pool upper
@@ -77,6 +87,17 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/),
 y el proyecto sigue [Versionado Semántico](https://semver.org/).
 
 ## [0.3.0] — 2026-06-14
+
+### Agregado
+
+- **password_toolkit:** entrada segura de la contraseña mediante `getpass` cuando se omite
+  (la contraseña ya no es obligatoria en la línea de comandos, donde quedaría expuesta en
+  el historial del shell y la lista de procesos); la contraseña nunca se escribe en disco
+  ni en logs.
+- **password_toolkit:** detección de tokens débiles por diccionario con una lista curada
+  embebida (`data/common_passwords.txt`) y soporte para una wordlist externa (`.txt` o
+  `.gz`) mediante `--wordlist` o la variable de entorno `PSTK_WORDLIST`; se detectan
+  palabras del diccionario embebidas, no solo coincidencias exactas.
 
 ### Cambiado
 
