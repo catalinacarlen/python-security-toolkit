@@ -1,6 +1,16 @@
 """Tests del verificador de integridad."""
 
-from file_integrity import comparar, generar_manifiesto, hash_archivo
+
+import pytest
+from file_integrity import (
+    cargar_manifiesto,
+    comparar,
+    firmar,
+    generar_manifiesto,
+    guardar_manifiesto,
+    hash_archivo,
+    verificar_firma,
+)
 
 
 def test_hash_cambia_si_cambia_el_contenido(tmp_path) -> None:
@@ -13,23 +23,71 @@ def test_hash_cambia_si_cambia_el_contenido(tmp_path) -> None:
     assert len(h1) == 64  # SHA-256 en hex
 
 
-def test_manifiesto_lista_todos_los_archivos(tmp_path) -> None:
+def test_manifiesto_lista_archivos_con_hash_y_modo(tmp_path) -> None:
     (tmp_path / "a.txt").write_text("a")
     (tmp_path / "b.txt").write_text("b")
     manifiesto = generar_manifiesto(str(tmp_path))
     assert set(manifiesto) == {"a.txt", "b.txt"}
+    assert "hash" in manifiesto["a.txt"] and "modo" in manifiesto["a.txt"]
 
 
-def test_comparar_detecta_los_tres_tipos_de_cambio() -> None:
-    base = {"igual.txt": "h1", "mod.txt": "h2", "borrado.txt": "h3"}
-    actual = {"igual.txt": "h1", "mod.txt": "DISTINTO", "nuevo.txt": "h4"}
+def test_comparar_detecta_los_tipos_de_cambio() -> None:
+    base = {
+        "igual.txt": {"hash": "h1", "modo": "0o644"},
+        "mod.txt": {"hash": "h2", "modo": "0o644"},
+        "borrado.txt": {"hash": "h3", "modo": "0o644"},
+    }
+    actual = {
+        "igual.txt": {"hash": "h1", "modo": "0o644"},
+        "mod.txt": {"hash": "DISTINTO", "modo": "0o644"},
+        "nuevo.txt": {"hash": "h4", "modo": "0o644"},
+    }
     cambios = comparar(base, actual)
     assert cambios["modificados"] == ["mod.txt"]
     assert cambios["nuevos"] == ["nuevo.txt"]
     assert cambios["eliminados"] == ["borrado.txt"]
 
 
-def test_comparar_sin_cambios_da_listas_vacias() -> None:
-    base = {"a.txt": "h"}
-    cambios = comparar(base, dict(base))
-    assert cambios == {"modificados": [], "nuevos": [], "eliminados": []}
+def test_comparar_detecta_cambio_de_permisos() -> None:
+    base = {"app.conf": {"hash": "h", "modo": "0o644"}}
+    actual = {"app.conf": {"hash": "h", "modo": "0o777"}}  # mismo contenido, otros permisos
+    cambios = comparar(base, actual)
+    assert cambios["permisos"] == ["app.conf"]
+    assert cambios["modificados"] == []
+
+
+def test_baseline_firmado_se_verifica(tmp_path) -> None:
+    (tmp_path / "a.txt").write_text("a")
+    manifiesto = generar_manifiesto(str(tmp_path))
+    firma = firmar(manifiesto, "clave-secreta")
+    assert verificar_firma(manifiesto, firma, "clave-secreta") is True
+    assert verificar_firma(manifiesto, firma, "clave-incorrecta") is False
+
+
+def test_cargar_baseline_manipulado_lanza_error(tmp_path) -> None:
+    (tmp_path / "a.txt").write_text("a")
+    base_file = tmp_path / "baseline.json"
+    guardar_manifiesto(generar_manifiesto(str(tmp_path)), str(base_file), clave="k")
+
+    # Un atacante edita el baseline para ocultar un cambio.
+    import json
+    datos = json.loads(base_file.read_text())
+    datos["manifiesto"]["a.txt"]["hash"] = "0" * 64
+    base_file.write_text(json.dumps(datos))
+
+    with pytest.raises(ValueError):
+        cargar_manifiesto(str(base_file), clave="k")
+
+
+def test_ciclo_completo_baseline_y_check(tmp_path) -> None:
+    datos = tmp_path / "datos"          # directorio vigilado
+    datos.mkdir()
+    base_file = tmp_path / "baseline.json"  # baseline FUERA del directorio vigilado
+    (datos / "a.txt").write_text("contenido")
+    guardar_manifiesto(generar_manifiesto(str(datos)), str(base_file))
+
+    (datos / "a.txt").write_text("modificado")
+    (datos / "nuevo.txt").write_text("x")
+    cambios = comparar(cargar_manifiesto(str(base_file)), generar_manifiesto(str(datos)))
+    assert cambios["modificados"] == ["a.txt"]
+    assert cambios["nuevos"] == ["nuevo.txt"]

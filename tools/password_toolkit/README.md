@@ -1,34 +1,52 @@
 # Password Toolkit
 
-Three utilities in one: a strength **meter**, a cryptographically secure **generator** (`secrets`), and **hashing** with `hashlib`.
+An auditor for passwords: it measures strength by **real entropy (bits)**, estimates **crack time**, checks the password against **real-world breaches** (Have I Been Pwned, privately), generates secure passwords, and hashes them correctly.
 
 ## What it does
-Scores how strong a password is, generates robust random passwords, and computes a hash of a password (optionally with a salt).
+- **Audit** — one command returns entropy, strength, estimated crack time and breach status.
+- **Strength by entropy** — instead of an arbitrary score, it computes the size of the search space in bits and penalizes weak patterns (common passwords, repeats, keyboard/alphabet sequences).
+- **Breach check (HIBP)** — tells you how many times a password has appeared in known leaks.
+- **Generator** — cryptographically secure, with `secrets`.
+- **Hashing** — `SHA-256` for integrity and **PBKDF2-HMAC-SHA256** (salted, slow) for password storage.
 
 ## How it works (and why)
-- **Strength meter:** a password's resistance to guessing grows with its *length* and its *variety of character classes* (lower, upper, digits, symbols). More length and more variety mean a far larger search space for an attacker, so the score rewards both.
-- **Secure generator:** it uses the `secrets` module, not `random`. `random` is a pseudo-random generator designed for reproducibility, so its output can be predicted — useless for security. `secrets` draws from the operating system's cryptographically secure source. The generator also forces at least one character of every class so the result is always strong.
-- **Hashing:** a hash is a **one-way** function — easy to compute, practically impossible to reverse. Storing the hash instead of the password means a leak doesn't expose the original. A **salt** (random text added before hashing) ensures two identical passwords produce different hashes, defeating precomputed-table attacks.
+- **Entropy, not vibes.** Strength is estimated as `length × log2(pool)`, where *pool* is the size of the character set used. This is why length matters more than throwing in one symbol: every extra character multiplies the attacker's work. Weak structures (e.g. `password`, `aaa`, `qwerty`, `123456`) get bits subtracted, because a real attacker tries those first.
+- **Crack time.** The bits are translated into an average guessing time at a configurable rate (default 10¹⁰ guesses/sec, a modern GPU against a fast hash). It turns an abstract number into "instant" vs "thousands of centuries".
+- **Breach check via k-anonymity.** The password is hashed with SHA-1 locally and **only the first 5 characters** of that hash are sent to the HIBP range API. The API returns every suffix sharing that prefix and the match is resolved on your machine — **the password never leaves your computer**. With no network it degrades gracefully (returns "not verifiable").
+- **Storage done right.** `SHA-256` is fast, which is exactly what you *don't* want for stored passwords. `derivar()` uses PBKDF2 with a random per-user salt and 200k iterations, and verification uses a constant-time comparison to avoid timing attacks.
 
 ## Usage
 ```bash
+# full report (entropy + crack time + breach check)
+python3 password_toolkit.py auditar "C0rr3ct-H0rs3_Battery$taple!9"
+python3 password_toolkit.py --json auditar --offline "Abc123!"   # no network
+
 python3 password_toolkit.py evaluar "Abc123!"
 python3 password_toolkit.py generar -l 20
-python3 password_toolkit.py hashear "my-key" --salt random
+python3 password_toolkit.py hashear "my-key" --algoritmo pbkdf2
+python3 password_toolkit.py filtrada "password"                  # query HIBP
 ```
 
 ## Example output
 ```
-Fortaleza: Muy fuerte (4/4)
-7?.h9[AiQ_UmsH8K
-9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+$ password_toolkit.py evaluar "C0rr3ct-H0rs3_Battery$taple!9"
+Fortaleza: Muy fuerte (4/4) — 190.1 bits — crackeo: miles de siglos
+
+$ password_toolkit.py --json auditar --offline "password"
+{
+  "longitud": 8,
+  "entropia_bits": 17.6,
+  "fortaleza": "Muy débil",
+  "tiempo_crackeo_estimado": "instantáneo",
+  ...
+}
 ```
 
 ## Security note
-`SHA-256` is fine for integrity checks but **not** for storing passwords in production: for that, use slow, salted algorithms like **bcrypt, scrypt or Argon2**, which are deliberately expensive to brute-force.
+`SHA-256` is for integrity, **not** password storage. For storage use slow, salted algorithms — PBKDF2 (shown here, stdlib) or, better still, **bcrypt, scrypt or Argon2**.
 
 ## Concepts applied
-Strings, functions, decision structures, logical operators and modules (`secrets`, `hashlib`, `string`).
+Strings, functions, decision structures, modules (`secrets`, `hashlib`, `urllib`), entropy/`math`, and safe network handling. Tests mock the network so they run offline.
 
 ## Tests
 ```bash
@@ -40,35 +58,53 @@ pytest
 
 # Password Toolkit (ES)
 
-Tres utilidades en una: **evaluador** de fortaleza, **generador** criptográficamente seguro (`secrets`) y **hashing** con `hashlib`.
+Un auditor de contraseñas: mide la fortaleza por **entropía real (bits)**, estima el **tiempo de crackeo**, verifica la contraseña contra **filtraciones reales** (Have I Been Pwned, de forma privada), genera contraseñas seguras y las hashea como corresponde.
 
 ## Qué hace
-Puntúa qué tan fuerte es una contraseña, genera contraseñas aleatorias robustas y calcula el hash de una contraseña (con salt opcional).
+- **Auditar** — un solo comando devuelve entropía, fortaleza, tiempo de crackeo estimado y estado de filtración.
+- **Fortaleza por entropía** — en vez de un puntaje arbitrario, calcula el tamaño del espacio de búsqueda en bits y penaliza patrones débiles (contraseñas comunes, repeticiones, secuencias de teclado/alfabeto).
+- **Chequeo de filtración (HIBP)** — te dice cuántas veces apareció la contraseña en brechas conocidas.
+- **Generador** — criptográficamente seguro, con `secrets`.
+- **Hashing** — `SHA-256` para integridad y **PBKDF2-HMAC-SHA256** (con salt, lento) para almacenamiento de contraseñas.
 
 ## Cómo funciona (y por qué)
-- **Evaluador de fortaleza:** la resistencia de una contraseña a ser adivinada crece con su *longitud* y su *variedad de tipos de caracteres* (minúsculas, mayúsculas, dígitos, símbolos). A mayor longitud y variedad, mucho mayor el espacio de búsqueda para un atacante, así que el puntaje premia ambas cosas.
-- **Generador seguro:** usa el módulo `secrets`, no `random`. `random` es un generador pseudoaleatorio pensado para ser reproducible, por lo que su salida se puede predecir — inútil para seguridad. `secrets` toma valores de la fuente criptográficamente segura del sistema operativo. Además, el generador obliga a incluir al menos un carácter de cada clase para que el resultado siempre sea fuerte.
-- **Hashing:** un hash es una función de **un solo sentido** — fácil de calcular, prácticamente imposible de revertir. Guardar el hash en vez de la contraseña hace que una filtración no exponga el original. Un **salt** (texto aleatorio añadido antes de hashear) logra que dos contraseñas iguales produzcan hashes distintos, frustrando los ataques con tablas precalculadas.
+- **Entropía, no intuición.** La fortaleza se estima como `longitud × log2(pool)`, donde *pool* es el tamaño del conjunto de caracteres usado. Por eso la longitud pesa más que meter un símbolo suelto: cada carácter extra multiplica el trabajo del atacante. Las estructuras débiles (`password`, `aaa`, `qwerty`, `123456`) restan bits, porque un atacante real las prueba primero.
+- **Tiempo de crackeo.** Los bits se traducen a un tiempo medio de adivinanza a una tasa configurable (por defecto 10¹⁰ intentos/seg, una GPU moderna contra un hash rápido). Convierte un número abstracto en "instantáneo" vs "miles de siglos".
+- **Chequeo por k-anonymity.** La contraseña se hashea con SHA-1 localmente y **solo se envían los 5 primeros caracteres** de ese hash a la API de rangos de HIBP. La API devuelve todos los sufijos que comparten ese prefijo y la coincidencia se resuelve en tu equipo — **la contraseña nunca sale de tu computadora**. Sin red, degrada con elegancia (devuelve "no verificable").
+- **Almacenamiento bien hecho.** `SHA-256` es rápido, justo lo que *no* querés para contraseñas guardadas. `derivar()` usa PBKDF2 con salt aleatorio por usuario y 200k iteraciones, y la verificación usa comparación en tiempo constante para evitar ataques de temporización.
 
 ## Uso
 ```bash
+# reporte completo (entropía + crack time + filtraciones)
+python3 password_toolkit.py auditar "C0rr3ct-H0rs3_Battery$taple!9"
+python3 password_toolkit.py --json auditar --offline "Abc123!"   # sin red
+
 python3 password_toolkit.py evaluar "Abc123!"
 python3 password_toolkit.py generar -l 20
-python3 password_toolkit.py hashear "mi-clave" --salt aleatorio
+python3 password_toolkit.py hashear "mi-clave" --algoritmo pbkdf2
+python3 password_toolkit.py filtrada "password"                  # consulta HIBP
 ```
 
 ## Ejemplo de salida
 ```
-Fortaleza: Muy fuerte (4/4)
-7?.h9[AiQ_UmsH8K
-9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+$ password_toolkit.py evaluar "C0rr3ct-H0rs3_Battery$taple!9"
+Fortaleza: Muy fuerte (4/4) — 190.1 bits — crackeo: miles de siglos
+
+$ password_toolkit.py --json auditar --offline "password"
+{
+  "longitud": 8,
+  "entropia_bits": 17.6,
+  "fortaleza": "Muy débil",
+  "tiempo_crackeo_estimado": "instantáneo",
+  ...
+}
 ```
 
 ## Nota de seguridad
-`SHA-256` sirve para verificar integridad, **no** para guardar contraseñas en producción: para eso se usan algoritmos lentos y con *salt* como **bcrypt, scrypt o Argon2**, deliberadamente costosos de romper por fuerza bruta.
+`SHA-256` es para integridad, **no** para guardar contraseñas. Para almacenar, usá algoritmos lentos y con *salt* — PBKDF2 (mostrado acá, stdlib) o, mejor aún, **bcrypt, scrypt o Argon2**.
 
 ## Conceptos aplicados
-Strings, funciones, estructuras de decisión, operadores lógicos y módulos (`secrets`, `hashlib`, `string`).
+Strings, funciones, estructuras de decisión, módulos (`secrets`, `hashlib`, `urllib`), entropía/`math` y manejo seguro de red. Los tests mockean la red para correr offline.
 
 ## Tests
 ```bash

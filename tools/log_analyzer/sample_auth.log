@@ -1,10 +1,33 @@
-May 31 10:01:11 server sshd[2011]: Failed password for invalid user admin from 192.168.0.5 port 22 ssh2
-May 31 10:01:13 server sshd[2012]: Failed password for invalid user admin from 192.168.0.5 port 22 ssh2
-May 31 10:01:15 server sshd[2013]: Failed password for root from 192.168.0.5 port 22 ssh2
-May 31 10:01:17 server sshd[2014]: Failed password for root from 192.168.0.5 port 22 ssh2
-May 31 10:01:19 server sshd[2015]: Failed password for invalid user test from 192.168.0.5 port 22 ssh2
-May 31 10:01:21 server sshd[2016]: Failed password for invalid user oracle from 192.168.0.5 port 22 ssh2
+# Log de ejemplo (auth.log de Linux) con varios escenarios de ataque para la demo.
+#
+# 192.168.0.5  -> R001 fuerza bruta: ráfaga de fallos contra 'root' en segundos.
+# 203.0.113.9  -> R002 password spraying: muchos usuarios distintos, 1 intento c/u.
+# 45.33.12.6   -> R003 enumeración: varios 'invalid user' (usuarios inexistentes).
+# 198.51.100.7 -> R004 compromiso: fallos repetidos y luego un login EXITOSO.
+# 10.0.0.20    -> tráfico legítimo (no debe generar alertas).
+
+May 31 10:01:11 server sshd[2010]: Failed password for root from 192.168.0.5 port 22 ssh2
+May 31 10:01:13 server sshd[2011]: Failed password for root from 192.168.0.5 port 22 ssh2
+May 31 10:01:14 server sshd[2012]: Failed password for root from 192.168.0.5 port 22 ssh2
+May 31 10:01:16 server sshd[2013]: Failed password for root from 192.168.0.5 port 22 ssh2
+May 31 10:01:18 server sshd[2014]: Failed password for root from 192.168.0.5 port 22 ssh2
+May 31 10:01:20 server sshd[2015]: Failed password for root from 192.168.0.5 port 22 ssh2
+
 May 31 10:02:05 server sshd[2050]: Accepted password for cata from 10.0.0.20 port 51000 ssh2
-May 31 10:05:31 server sshd[2099]: Failed password for invalid user pi from 203.0.113.9 port 40222 ssh2
-May 31 10:05:33 server sshd[2100]: Failed password for invalid user pi from 203.0.113.9 port 40223 ssh2
-May 31 10:12:44 server sshd[2210]: Failed password for root from 198.51.100.7 port 33001 ssh2
+
+May 31 10:05:31 server sshd[2099]: Failed password for admin from 203.0.113.9 port 40222 ssh2
+May 31 10:05:34 server sshd[2100]: Failed password for ubuntu from 203.0.113.9 port 40225 ssh2
+May 31 10:05:37 server sshd[2101]: Failed password for deploy from 203.0.113.9 port 40230 ssh2
+May 31 10:05:41 server sshd[2102]: Failed password for postgres from 203.0.113.9 port 40236 ssh2
+May 31 10:05:45 server sshd[2103]: Failed password for jenkins from 203.0.113.9 port 40240 ssh2
+May 31 10:05:49 server sshd[2104]: Failed password for git from 203.0.113.9 port 40244 ssh2
+
+May 31 10:08:02 server sshd[2210]: Failed password for invalid user pi from 45.33.12.6 port 33001 ssh2
+May 31 10:08:05 server sshd[2211]: Failed password for invalid user oracle from 45.33.12.6 port 33010 ssh2
+May 31 10:08:08 server sshd[2212]: Failed password for invalid user test from 45.33.12.6 port 33020 ssh2
+May 31 10:08:11 server sshd[2213]: Failed password for invalid user backup from 45.33.12.6 port 33030 ssh2
+
+May 31 10:12:40 server sshd[2300]: Failed password for santi from 198.51.100.7 port 50001 ssh2
+May 31 10:12:43 server sshd[2301]: Failed password for santi from 198.51.100.7 port 50005 ssh2
+May 31 10:12:46 server sshd[2302]: Failed password for santi from 198.51.100.7 port 50009 ssh2
+May 31 10:12:55 server sshd[2303]: Accepted password for santi from 198.51.100.7 port 50012 ssh2

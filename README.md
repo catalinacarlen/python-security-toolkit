@@ -3,6 +3,9 @@
 ![tests](https://github.com/catalinacarlen/python-security-toolkit/actions/workflows/tests.yml/badge.svg)
 ![python](https://img.shields.io/badge/python-3.8%2B-blue)
 ![deps](https://img.shields.io/badge/dependencies-stdlib%20only-green)
+![lint](https://img.shields.io/badge/lint-ruff-blue)
+![types](https://img.shields.io/badge/types-mypy-blue)
+![coverage](https://img.shields.io/badge/coverage-72%25-green)
 
 A small collection of **security-focused command-line tools written in pure Python** (standard library only), each with its own documentation and automated tests. Built while studying Cybersecurity at Universidad de Palermo, applying core programming concepts to practical security tasks.
 
@@ -14,33 +17,47 @@ A small collection of **security-focused command-line tools written in pure Pyth
 
 | Tool | What it does | Security concept |
 |------|--------------|------------------|
-| [**port_scanner**](tools/port_scanner) | Concurrent TCP port scanner using `socket` | Reconnaissance / asset discovery |
-| [**log_analyzer**](tools/log_analyzer) | Detects SSH brute-force in `auth.log` | Log analysis / SIEM rules |
-| [**password_toolkit**](tools/password_toolkit) | Strength meter, secure generator, hashing | Authentication / cryptography |
-| [**file_integrity**](tools/file_integrity) | SHA-256 baseline & change detection (FIM) | Integrity monitoring |
-| [**sqli_lab**](tools/sqli_lab) | Vulnerable vs. parameterized SQL demo | Secure development / OWASP |
+| [**port_scanner**](tools/port_scanner) | Concurrent TCP scanner with banner grabbing & service fingerprinting | Reconnaissance / asset discovery |
+| [**log_analyzer**](tools/log_analyzer) | SIEM-style rules over `auth.log`: brute force, spraying, enumeration, compromise | Log analysis / detection engineering |
+| [**password_toolkit**](tools/password_toolkit) | Entropy-based strength, crack-time, HIBP breach check (k-anonymity), PBKDF2 | Authentication / cryptography |
+| [**file_integrity**](tools/file_integrity) | FIM with permission tracking, HMAC-signed baseline & watch mode | Integrity monitoring |
+| [**sqli_lab**](tools/sqli_lab) | Multiple SQLi families (UNION/blind/time) + payload classifier | Secure development / OWASP |
 
 Each tool folder contains the code, a focused `README.md`, and a `test_*.py` test suite.
 
-## Quick start
+## Install
 
 ```bash
 git clone https://github.com/catalinacarlen/python-security-toolkit
 cd python-security-toolkit
-
-python3 tools/port_scanner/port_scanner.py 127.0.0.1
-python3 tools/log_analyzer/log_analyzer.py tools/log_analyzer/sample_auth.log
-python3 tools/sqli_lab/sqli_lab.py --demo
+pip install -e .          # installs the unified `pstk` command (stdlib only)
 ```
 
-## Running the tests
+## Quick start
+
+Everything is reachable through a single command — `pstk <tool>`:
 
 ```bash
-pip install pytest
-for dir in tools/*/; do (cd "$dir" && python -m pytest -q); done
+pstk scan 127.0.0.1                              # port scan + banner grabbing
+pstk logs tools/log_analyzer/sample_auth.log     # SIEM-style detections
+pstk pwd auditar --offline "Abc123!"             # password audit (entropy, crack-time)
+pstk fim baseline ./my_dir -k "secret-key"       # signed integrity baseline
+pstk sqli --demo                                 # SQL injection lab
+pstk <tool> --help                               # options for each tool
 ```
 
-Tests also run automatically on every push via GitHub Actions (see the badge above).
+Each tool is also runnable as a standalone script (e.g. `python3 tools/port_scanner/port_scanner.py 127.0.0.1`).
+
+## Quality & tests
+
+```bash
+pip install -e ".[dev]"     # pytest, ruff, mypy, coverage
+ruff check .                # lint
+mypy pstk tools             # type check
+coverage run --source=tools,pstk -m pytest tools tests && coverage report
+```
+
+Lint, type check and tests run automatically on every push via GitHub Actions (see the badges above).
 
 ## Documentation
 
@@ -56,10 +73,12 @@ The [`docs/`](docs) folder contains the theory behind the code, organized as a r
 
 ```
 python-security-toolkit/
+├── pstk/             # unified `pstk` CLI that dispatches to each tool
 ├── tools/            # 5 security tools, each with code + README + tests
+├── tests/            # tests for the unified CLI
 ├── docs/             # programming theory as reference
-├── .github/workflows # CI: pytest on every push
-└── requirements.txt  # stdlib only — no external dependencies
+├── .github/workflows # CI: ruff + mypy + pytest/coverage on every push
+└── pyproject.toml    # packaging, entry point and tooling config (stdlib only)
 ```
 
 ---
@@ -75,33 +94,47 @@ Una colección de **herramientas de línea de comandos orientadas a la seguridad
 
 | Herramienta | Qué hace | Concepto de seguridad |
 |-------------|----------|------------------------|
-| [**port_scanner**](tools/port_scanner) | Escáner de puertos TCP concurrente con `socket` | Reconocimiento / descubrimiento de activos |
-| [**log_analyzer**](tools/log_analyzer) | Detecta fuerza bruta SSH en `auth.log` | Análisis de logs / reglas de SIEM |
-| [**password_toolkit**](tools/password_toolkit) | Evaluador de fortaleza, generador seguro, hashing | Autenticación / criptografía |
-| [**file_integrity**](tools/file_integrity) | Línea de base SHA-256 y detección de cambios (FIM) | Monitoreo de integridad |
-| [**sqli_lab**](tools/sqli_lab) | Demo SQL vulnerable vs. parametrizada | Desarrollo seguro / OWASP |
+| [**port_scanner**](tools/port_scanner) | Escáner TCP concurrente con banner grabbing y fingerprinting de servicio | Reconocimiento / descubrimiento de activos |
+| [**log_analyzer**](tools/log_analyzer) | Reglas estilo SIEM sobre `auth.log`: fuerza bruta, spraying, enumeración, compromiso | Análisis de logs / detección |
+| [**password_toolkit**](tools/password_toolkit) | Fortaleza por entropía, tiempo de crackeo, chequeo HIBP (k-anonymity), PBKDF2 | Autenticación / criptografía |
+| [**file_integrity**](tools/file_integrity) | FIM con control de permisos, baseline firmado (HMAC) y modo watch | Monitoreo de integridad |
+| [**sqli_lab**](tools/sqli_lab) | Varias familias de SQLi (UNION/blind/time) + clasificador de payloads | Desarrollo seguro / OWASP |
 
 Cada carpeta contiene el código, un `README.md` propio y una batería de tests `test_*.py`.
 
-## Uso rápido
+## Instalación
 
 ```bash
 git clone https://github.com/catalinacarlen/python-security-toolkit
 cd python-security-toolkit
-
-python3 tools/port_scanner/port_scanner.py 127.0.0.1
-python3 tools/log_analyzer/log_analyzer.py tools/log_analyzer/sample_auth.log
-python3 tools/sqli_lab/sqli_lab.py --demo
+pip install -e .          # instala el comando unificado `pstk` (solo stdlib)
 ```
 
-## Ejecutar los tests
+## Uso rápido
+
+Todo se accede desde un único comando — `pstk <herramienta>`:
 
 ```bash
-pip install pytest
-for dir in tools/*/; do (cd "$dir" && python -m pytest -q); done
+pstk scan 127.0.0.1                              # escaneo de puertos + banner grabbing
+pstk logs tools/log_analyzer/sample_auth.log     # detecciones estilo SIEM
+pstk pwd auditar --offline "Abc123!"             # auditoría de contraseña (entropía, crack-time)
+pstk fim baseline ./mi_dir -k "clave-secreta"    # baseline de integridad firmado
+pstk sqli --demo                                 # laboratorio de SQL injection
+pstk <herramienta> --help                        # opciones de cada herramienta
 ```
 
-Los tests también corren automáticamente en cada push mediante GitHub Actions (ver el badge de arriba).
+Cada herramienta también se puede correr como script suelto (ej. `python3 tools/port_scanner/port_scanner.py 127.0.0.1`).
+
+## Calidad y tests
+
+```bash
+pip install -e ".[dev]"     # pytest, ruff, mypy, coverage
+ruff check .                # lint
+mypy pstk tools             # chequeo de tipos
+coverage run --source=tools,pstk -m pytest tools tests && coverage report
+```
+
+El lint, el chequeo de tipos y los tests corren automáticamente en cada push mediante GitHub Actions (ver los badges de arriba).
 
 ## Documentación
 

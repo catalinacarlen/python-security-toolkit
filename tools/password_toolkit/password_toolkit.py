@@ -1,40 +1,147 @@
-"""Kit de contraseñas: evalúa fortaleza, genera contraseñas seguras y hashea.
+"""Kit de contraseñas: fortaleza por entropía, generación segura, hashing y breach-check.
 
-- Evaluador de fortaleza por longitud y variedad de caracteres.
-- Generador criptográficamente seguro con el módulo `secrets`.
-- Hashing con SHA-256 (con nota sobre el salting).
+Capacidades:
+- Fortaleza basada en **entropía real (bits)** y penalizaciones por patrones débiles
+  (repeticiones, secuencias, contraseñas comunes), no en una heurística arbitraria.
+- Estimación del **tiempo de crackeo** a una tasa de adivinanzas configurable.
+- **Generador criptográficamente seguro** con el módulo `secrets`.
+- **Verificación contra filtraciones** vía Have I Been Pwned usando el modelo de
+  *k-anonymity*: nunca se envía la contraseña ni su hash completo, solo los 5
+  primeros caracteres del SHA-1. Funciona con `urllib` (stdlib) y degrada con
+  elegancia si no hay red.
+- **Hashing**: SHA-256 (integridad) y PBKDF2-HMAC-SHA256 con salt (almacenamiento
+  de contraseñas hecho como corresponde).
 
-Conceptos de la materia aplicados: strings, funciones, estructuras de decisión
-y operadores lógicos.
+Solo librería estándar. Para uso educativo y en entornos autorizados.
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import json
+import math
+import re
 import secrets
 import string
+from urllib import error, request
 
 NIVELES = {0: "Muy débil", 1: "Débil", 2: "Aceptable", 3: "Fuerte", 4: "Muy fuerte"}
 
+# Pequeña lista de contraseñas notoriamente comunes (offline). No pretende ser
+# exhaustiva: el chequeo serio es contra HIBP (ver verificar_filtrada).
+COMUNES = {
+    "password", "123456", "123456789", "qwerty", "12345678", "111111",
+    "1234567890", "1234567", "password1", "12345", "qwerty123", "1q2w3e",
+    "admin", "abc123", "letmein", "iloveyou", "monkey", "dragon", "football",
+}
+
+# Secuencias usadas para penalizar (teclado y alfabeto/numérica).
+_SECUENCIAS = ["abcdefghijklmnopqrstuvwxyz", "0123456789", "qwertyuiop", "asdfghjkl", "zxcvbnm"]
+
+
+def _tamano_alfabeto(password: str) -> int:
+    """Estima el tamaño del espacio de caracteres (pool) que usa la contraseña."""
+    pool = 0
+    if any(c.islower() for c in password):
+        pool += 26
+    if any(c.isupper() for c in password):
+        pool += 26
+    if any(c.isdigit() for c in password):
+        pool += 10
+    if any(c in string.punctuation for c in password):
+        pool += len(string.punctuation)
+    if any(c == " " for c in password):
+        pool += 1
+    # Caracteres fuera de ASCII imprimible (acentos, etc.): aporte conservador.
+    if any(ord(c) > 127 for c in password):
+        pool += 100
+    return pool
+
+
+def _tiene_secuencia(password: str, largo: int = 4) -> bool:
+    """True si contiene una secuencia ascendente/descendente de `largo` o más."""
+    p = password.lower()
+    for seq in _SECUENCIAS:
+        for i in range(len(seq) - largo + 1):
+            fragmento = seq[i:i + largo]
+            if fragmento in p or fragmento[::-1] in p:
+                return True
+    return False
+
+
+def _penalizacion_patrones(password: str) -> float:
+    """Devuelve bits a restar por debilidades estructurales."""
+    castigo = 0.0
+    p = password.lower()
+    if p in COMUNES or any(comun in p for comun in COMUNES if len(comun) >= 5):
+        castigo += 20
+    if re.search(r"(.)\1{2,}", password):           # 3+ caracteres repetidos seguidos
+        castigo += 8
+    if _tiene_secuencia(password):                  # secuencias de teclado/alfabeto
+        castigo += 8
+    if re.fullmatch(r"\d+", password):              # solo dígitos
+        castigo += 6
+    return castigo
+
+
+def entropia_bits(password: str) -> float:
+    """Entropía estimada en bits: len * log2(pool) menos penalizaciones.
+
+    Es una aproximación pedagógica (modelo de "pool de caracteres"), suficiente
+    para comparar contraseñas y explicar por qué la longitud importa más que la
+    variedad. No reemplaza a un estimador como zxcvbn, pero captura lo esencial.
+    """
+    if not password:
+        return 0.0
+    pool = _tamano_alfabeto(password)
+    bruta = len(password) * math.log2(pool) if pool else 0.0
+    return max(0.0, bruta - _penalizacion_patrones(password))
+
+
+def tiempo_crackeo(bits: float, adivinanzas_por_segundo: float = 1e10) -> str:
+    """Traduce bits de entropía a un tiempo medio de crackeo legible.
+
+    Por defecto asume 10^10 intentos/seg (GPU moderna contra un hash rápido).
+    """
+    combinaciones = 2 ** bits
+    segundos = (combinaciones / 2) / adivinanzas_por_segundo
+    if segundos < 1:
+        return "instantáneo"
+    unidades = [
+        ("siglos", 60 * 60 * 24 * 365 * 100),
+        ("años", 60 * 60 * 24 * 365),
+        ("días", 60 * 60 * 24),
+        ("horas", 60 * 60),
+        ("minutos", 60),
+        ("segundos", 1),
+    ]
+    for nombre, factor in unidades:
+        if segundos >= factor:
+            cantidad = segundos / factor
+            if nombre == "siglos" and cantidad > 1000:
+                return "miles de siglos"
+            return f"{cantidad:.0f} {nombre}"
+    return "instantáneo"
+
 
 def evaluar_fortaleza(password: str) -> tuple[int, str]:
-    """Devuelve (puntaje 0-4, etiqueta) según longitud y tipos de caracteres."""
-    puntaje = 0
-    if len(password) >= 8:
-        puntaje += 1
-    if len(password) >= 12:
-        puntaje += 1
-    tiene_minuscula = any(c.islower() for c in password)
-    tiene_mayuscula = any(c.isupper() for c in password)
-    tiene_digito = any(c.isdigit() for c in password)
-    tiene_simbolo = any(c in string.punctuation for c in password)
-    variedad = sum([tiene_minuscula, tiene_mayuscula, tiene_digito, tiene_simbolo])
-    if variedad >= 3:
-        puntaje += 1
-    if variedad == 4:
-        puntaje += 1
-    puntaje = min(puntaje, 4)
+    """Devuelve (puntaje 0-4, etiqueta) derivado de la entropía en bits.
+
+    Umbrales prácticos: <28 muy débil, <36 débil, <60 aceptable, <128 fuerte,
+    >=128 muy fuerte.
+    """
+    bits = entropia_bits(password)
+    if bits < 28:
+        puntaje = 0
+    elif bits < 36:
+        puntaje = 1
+    elif bits < 60:
+        puntaje = 2
+    elif bits < 128:
+        puntaje = 3
+    else:
+        puntaje = 4
     return puntaje, NIVELES[puntaje]
 
 
@@ -47,9 +154,7 @@ def generar_password(longitud: int = 16) -> str:
     if longitud < 4:
         raise ValueError("La longitud mínima es 4 para incluir todas las clases.")
     clases = [string.ascii_lowercase, string.ascii_uppercase, string.digits, string.punctuation]
-    # Un carácter obligatorio de cada clase...
     caracteres = [secrets.choice(clase) for clase in clases]
-    # ...y el resto desde el alfabeto completo.
     alfabeto = "".join(clases)
     caracteres += [secrets.choice(alfabeto) for _ in range(longitud - len(caracteres))]
     secrets.SystemRandom().shuffle(caracteres)
@@ -57,42 +162,147 @@ def generar_password(longitud: int = 16) -> str:
 
 
 def hashear(password: str, salt: str | None = None) -> str:
-    """Devuelve el hash SHA-256 en hexadecimal, con salt opcional.
+    """SHA-256 hexadecimal con salt opcional.
 
-    Nota de seguridad: SHA-256 sirve para verificar integridad, pero para
-    almacenar contraseñas en producción conviene un algoritmo lento y con salt
-    como bcrypt, scrypt o Argon2. El salt evita que dos contraseñas iguales
-    produzcan el mismo hash.
+    Útil para verificar integridad, NO para almacenar contraseñas (es rápido).
+    Para almacenamiento usar derivar() (PBKDF2).
     """
     dato = (salt or "") + password
     return hashlib.sha256(dato.encode("utf-8")).hexdigest()
 
 
+def derivar(password: str, salt: bytes | None = None, iteraciones: int = 200_000) -> str:
+    """Deriva la contraseña con PBKDF2-HMAC-SHA256 (lento + salt).
+
+    Así se guardan contraseñas de verdad: un algoritmo deliberadamente lento y un
+    salt aleatorio por usuario. Devuelve un string autocontenido
+    "pbkdf2_sha256$iteraciones$salt_hex$hash_hex" verificable con verificar_derivado().
+    """
+    if salt is None:
+        salt = secrets.token_bytes(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iteraciones)
+    return f"pbkdf2_sha256${iteraciones}${salt.hex()}${dk.hex()}"
+
+
+def verificar_derivado(password: str, codificado: str) -> bool:
+    """Verifica una contraseña contra un valor producido por derivar()."""
+    try:
+        algoritmo, iteraciones, salt_hex, hash_hex = codificado.split("$")
+    except ValueError:
+        return False
+    if algoritmo != "pbkdf2_sha256":
+        return False
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), bytes.fromhex(salt_hex), int(iteraciones))
+    return secrets.compare_digest(dk.hex(), hash_hex)  # comparación en tiempo constante
+
+
+def verificar_filtrada(password: str, timeout: float = 5.0) -> int | None:
+    """Cuenta cuántas veces apareció la contraseña en filtraciones, vía HIBP.
+
+    Usa *k-anonymity*: se calcula el SHA-1 de la contraseña y SOLO se envían los
+    primeros 5 caracteres del hash al endpoint de rangos. La API responde con
+    todos los sufijos que comparten ese prefijo; la coincidencia se resuelve
+    localmente. La contraseña nunca sale del equipo.
+
+    Devuelve la cantidad de apariciones (0 si no aparece) o None si no se pudo
+    consultar (sin red, timeout, etc.).
+    """
+    sha1 = hashlib.sha1(password.encode("utf-8")).hexdigest().upper()
+    prefijo, sufijo = sha1[:5], sha1[5:]
+    url = f"https://api.pwnedpasswords.com/range/{prefijo}"
+    try:
+        req = request.Request(url, headers={"User-Agent": "python-security-toolkit"})
+        with request.urlopen(req, timeout=timeout) as resp:
+            cuerpo = resp.read().decode("utf-8")
+    except (error.URLError, TimeoutError, OSError):
+        return None
+    for linea in cuerpo.splitlines():
+        suf, _, conteo = linea.partition(":")
+        if suf.strip() == sufijo:
+            return int(conteo.strip())
+    return 0
+
+
+def auditar(password: str, offline: bool = False) -> dict:
+    """Reúne todas las señales en un solo reporte (ideal para salida --json)."""
+    bits = entropia_bits(password)
+    puntaje, etiqueta = evaluar_fortaleza(password)
+    filtrada = None if offline else verificar_filtrada(password)
+    return {
+        "longitud": len(password),
+        "entropia_bits": round(bits, 1),
+        "fortaleza": etiqueta,
+        "puntaje": puntaje,
+        "tiempo_crackeo_estimado": tiempo_crackeo(bits),
+        "apariciones_en_filtraciones": filtrada,
+        "comprometida": (filtrada or 0) > 0 if filtrada is not None else None,
+    }
+
+
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Kit de contraseñas: evaluar, generar y hashear.")
+    parser = argparse.ArgumentParser(description="Kit de contraseñas: auditar, evaluar, generar, hashear.")
+    parser.add_argument("--json", action="store_true", help="Salida en formato JSON")
     sub = parser.add_subparsers(dest="accion", required=True)
 
-    p_eval = sub.add_parser("evaluar", help="Evalúa la fortaleza de una contraseña")
+    p_aud = sub.add_parser("auditar", help="Reporte completo: entropía, crack-time y filtraciones (HIBP)")
+    p_aud.add_argument("password")
+    p_aud.add_argument("--offline", action="store_true", help="No consultar HIBP (sin red)")
+
+    p_eval = sub.add_parser("evaluar", help="Evalúa la fortaleza por entropía")
     p_eval.add_argument("password")
 
     p_gen = sub.add_parser("generar", help="Genera una contraseña segura")
     p_gen.add_argument("-l", "--longitud", type=int, default=16)
 
-    p_hash = sub.add_parser("hashear", help="Calcula el hash SHA-256")
+    p_hash = sub.add_parser("hashear", help="Calcula el hash (sha256 o pbkdf2)")
     p_hash.add_argument("password")
     p_hash.add_argument("--salt", default=None)
+    p_hash.add_argument("--algoritmo", choices=["sha256", "pbkdf2"], default="sha256")
+
+    p_pwned = sub.add_parser("filtrada", help="Verifica la contraseña contra HIBP (k-anonymity)")
+    p_pwned.add_argument("password")
     return parser.parse_args()
+
+
+def _imprimir(datos: dict, como_json: bool) -> None:
+    if como_json:
+        print(json.dumps(datos, ensure_ascii=False, indent=2))
+    else:
+        for clave, valor in datos.items():
+            print(f"{clave:>28}: {valor}")
 
 
 def main() -> None:
     args = _parse_args()
-    if args.accion == "evaluar":
+    if args.accion == "auditar":
+        _imprimir(auditar(args.password, offline=args.offline), args.json)
+    elif args.accion == "evaluar":
         puntaje, etiqueta = evaluar_fortaleza(args.password)
-        print(f"Fortaleza: {etiqueta} ({puntaje}/4)")
+        bits = entropia_bits(args.password)
+        if args.json:
+            _imprimir({"fortaleza": etiqueta, "puntaje": puntaje, "entropia_bits": round(bits, 1),
+                       "tiempo_crackeo_estimado": tiempo_crackeo(bits)}, True)
+        else:
+            print(f"Fortaleza: {etiqueta} ({puntaje}/4) — {bits:.1f} bits — crackeo: {tiempo_crackeo(bits)}")
     elif args.accion == "generar":
-        print(generar_password(args.longitud))
+        pwd = generar_password(args.longitud)
+        _imprimir({"password": pwd}, True) if args.json else print(pwd)
     elif args.accion == "hashear":
-        print(hashear(args.password, args.salt))
+        valor = derivar(args.password) if args.algoritmo == "pbkdf2" else hashear(args.password, args.salt)
+        _imprimir({"algoritmo": args.algoritmo, "hash": valor}, True) if args.json else print(valor)
+    elif args.accion == "filtrada":
+        n = verificar_filtrada(args.password)
+        if n is None:
+            datos: dict[str, object] = {"estado": "no verificable (sin red)"}
+        elif n == 0:
+            datos = {"estado": "no aparece en filtraciones conocidas", "apariciones": 0}
+        else:
+            datos = {"estado": "COMPROMETIDA", "apariciones": n}
+        if args.json:
+            _imprimir(datos, True)
+        else:
+            extra = f" ({datos['apariciones']} apariciones)" if datos.get("apariciones") else ""
+            print(f"{datos['estado']}{extra}")
 
 
 if __name__ == "__main__":
