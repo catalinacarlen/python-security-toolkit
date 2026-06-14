@@ -19,6 +19,21 @@ def _reglas(alertas: list[dict]) -> set[str]:
 
 # --- Parseo -----------------------------------------------------------------
 
+def test_parsear_acepta_29_de_febrero() -> None:
+    # Una línea legítima de un año bisiesto no debe romper el parseo.
+    linea = "Feb 29 10:00:01 h sshd[1]: Failed password for root from 1.2.3.4 port 22 ssh2"
+    eventos = parsear([linea])
+    assert len(eventos) == 1
+    assert eventos[0].ts.month == 2 and eventos[0].ts.day == 29
+
+
+def test_parsear_sanitiza_caracteres_de_control_en_usuario() -> None:
+    # Usuario con secuencia de escape: no debe propagarse a la salida.
+    linea = "May 11 10:00:01 h sshd[1]: Accepted password for ro\x1b[2Jot from 1.2.3.4 port 22 ssh2"
+    ev = parsear([linea])
+    assert ev and "\x1b" not in ev[0].usuario
+
+
 def test_parsear_distingue_fallo_y_exito() -> None:
     lineas = [
         "May 11 10:00:01 h sshd[1]: Failed password for invalid user admin from 1.2.3.4 port 22 ssh2",

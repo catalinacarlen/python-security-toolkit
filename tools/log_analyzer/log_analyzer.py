@@ -60,10 +60,25 @@ class Evento:
         self.usuario_invalido = usuario_invalido
 
 
-def _timestamp(mes: str, dia: str, hora: str, anio: int = 1900) -> datetime:
+# Año base sintético para los timestamps de syslog (que no traen año). Se usa uno
+# bisiesto para que las líneas legítimas del 29 de febrero no rompan el parseo.
+_ANIO_BASE = 2020
+
+
+def _timestamp(mes: str, dia: str, hora: str, anio: int = _ANIO_BASE) -> datetime:
     """Construye un datetime desde los campos de syslog (que no traen año)."""
     h, m, s = (int(x) for x in hora.split(":"))
     return datetime(anio, _MESES.get(mes, 1), int(dia), h, m, s)
+
+
+def _sanitizar(texto: str) -> str:
+    """Quita caracteres de control de un campo del log.
+
+    El nombre de usuario proviene del log (lo controla el atacante en los intentos de
+    login) y llega a la salida de texto. Eliminar los caracteres no imprimibles evita
+    la inyección de secuencias de escape en la terminal al mostrar las alertas.
+    """
+    return "".join(c for c in texto if c.isprintable())
 
 
 def parsear(lineas: list[str]) -> list[Evento]:
@@ -74,14 +89,14 @@ def parsear(lineas: list[str]) -> list[Evento]:
         if m:
             eventos.append(Evento(
                 _timestamp(m["mes"], m["dia"], m["hora"]),
-                m["ip"], m["usuario"], exito=False,
+                m["ip"], _sanitizar(m["usuario"]), exito=False,
                 usuario_invalido=bool(m["invalido"])))
             continue
         m = PATRON_EXITO.search(linea)
         if m:
             eventos.append(Evento(
                 _timestamp(m["mes"], m["dia"], m["hora"]),
-                m["ip"], m["usuario"], exito=True, usuario_invalido=False))
+                m["ip"], _sanitizar(m["usuario"]), exito=True, usuario_invalido=False))
     return sorted(eventos, key=lambda e: e.ts)
 
 

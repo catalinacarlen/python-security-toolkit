@@ -47,6 +47,16 @@ def scan_port(host: str, port: int, timeout: float = 0.5) -> bool:
             return False
 
 
+def _sanitizar_banner(texto: str) -> str:
+    """Neutraliza un banner de un host no confiable antes de mostrarlo.
+
+    Un servidor malicioso puede incluir secuencias de escape ANSI en su banner para
+    manipular la terminal de quien escanea (borrar líneas, falsear texto, etc.). Se
+    reemplaza todo carácter de control / no imprimible (incluido ESC) por un espacio.
+    """
+    return "".join(c if (c.isprintable() or c == " ") else " " for c in texto).strip()
+
+
 def agarrar_banner(host: str, port: int, timeout: float = 1.0) -> str:
     """Intenta leer el banner de un puerto abierto.
 
@@ -71,7 +81,7 @@ def agarrar_banner(host: str, port: int, timeout: float = 1.0) -> str:
                     datos = sock.recv(256)
                 except OSError:
                     return ""
-            return datos.decode("latin-1", errors="replace").strip()
+            return _sanitizar_banner(datos.decode("latin-1", errors="replace"))
     except (socket.gaierror, OSError):
         return ""
 

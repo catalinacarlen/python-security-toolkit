@@ -4,6 +4,27 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.1] — 2026-06-14
+
+### Security
+
+- **port_scanner:** sanitize service banners before display. A banner is attacker-
+  controlled data; control characters (including ANSI escape sequences) are now
+  stripped to prevent terminal-escape injection when printing scan results.
+- **log_analyzer:** sanitize the username field at parse time. Usernames originate from
+  the log (attacker-controlled in login attempts) and reach the text output, so control
+  characters are stripped to prevent terminal-escape injection.
+- **file_integrity:** symlinks are no longer followed when building a manifest; they are
+  recorded by their target, which avoids hashing files outside the monitored tree and
+  detects type/target changes (e.g. a file replaced by a symlink).
+- **file_integrity:** `check` now warns on stderr when the baseline is signed but no
+  key is provided, instead of silently skipping signature verification.
+
+### Fixed
+
+- **log_analyzer:** the synthetic base year for syslog timestamps is now a leap year,
+  so legitimate `Feb 29` entries no longer raise `ValueError` and abort the analysis.
+
 ## [0.3.0] — 2026-06-14
 
 ### Added
@@ -86,6 +107,30 @@ Todos los cambios relevantes del proyecto se documentan aquí.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/),
 y el proyecto sigue [Versionado Semántico](https://semver.org/).
 
+## [0.3.1] — 2026-06-14
+
+### Seguridad
+
+- **port_scanner:** se sanitizan los banners de servicio antes de mostrarlos. El banner
+  es dato controlado por el host remoto; ahora se eliminan los caracteres de control
+  (incluidas las secuencias de escape ANSI) para evitar la inyección de secuencias de
+  escape en la terminal al imprimir los resultados.
+- **log_analyzer:** se sanitiza el campo de usuario al parsear. El usuario proviene del
+  log (controlado por el atacante en los intentos de login) y llega a la salida de texto,
+  por lo que se eliminan los caracteres de control para evitar la inyección de secuencias
+  de escape en la terminal.
+- **file_integrity:** los symlinks ya no se siguen al generar el manifiesto; se registran
+  por su destino, lo que evita hashear archivos fuera del árbol monitoreado y permite
+  detectar cambios de tipo/destino (p. ej. un archivo reemplazado por un enlace).
+- **file_integrity:** `check` ahora advierte por stderr cuando la línea de base está
+  firmada pero no se indicó clave, en lugar de omitir la verificación en silencio.
+
+### Corregido
+
+- **log_analyzer:** el año base sintético de los timestamps de syslog ahora es bisiesto,
+  por lo que las entradas legítimas del `29 de febrero` ya no lanzan `ValueError` ni
+  abortan el análisis.
+
 ## [0.3.0] — 2026-06-14
 
 ### Agregado
@@ -163,5 +208,6 @@ puertos, analizador de logs, kit de contraseñas, verificador de integridad de a
 laboratorio de inyección SQL), cada una con su README y batería de tests, y un workflow
 de GitHub Actions que ejecuta los tests.
 
+[0.3.1]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.3.1
 [0.3.0]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.3.0
 [0.2.0]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.2.0

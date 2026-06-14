@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 

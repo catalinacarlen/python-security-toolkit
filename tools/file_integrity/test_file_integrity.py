@@ -79,6 +79,37 @@ def test_cargar_baseline_manipulado_lanza_error(tmp_path) -> None:
         cargar_manifiesto(str(base_file), clave="k")
 
 
+def test_cargar_baseline_firmado_sin_clave_advierte(tmp_path, capsys) -> None:
+    (tmp_path / "a.txt").write_text("a")
+    base_file = tmp_path / "baseline.json"
+    guardar_manifiesto(generar_manifiesto(str(tmp_path)), str(base_file), clave="k")
+    # Cargar sin clave NO debe verificar la firma en silencio: tiene que avisar.
+    cargar_manifiesto(str(base_file))  # sin clave
+    assert "NO se verificó" in capsys.readouterr().err
+
+
+def test_symlink_no_se_sigue_y_se_registra_por_destino(tmp_path) -> None:
+    import os
+    (tmp_path / "real.txt").write_text("contenido")
+    enlace = tmp_path / "enlace"
+    os.symlink("real.txt", enlace)
+    manifiesto = generar_manifiesto(str(tmp_path))
+    assert manifiesto["enlace"] == {"tipo": "symlink", "destino": "real.txt"}
+    assert "hash" not in manifiesto["enlace"]  # no se hasheó el destino
+
+
+def test_cambio_de_destino_de_symlink_se_detecta() -> None:
+    base = {"e": {"tipo": "symlink", "destino": "a.txt"}}
+    actual = {"e": {"tipo": "symlink", "destino": "/etc/passwd"}}
+    assert comparar(base, actual)["modificados"] == ["e"]
+
+
+def test_archivo_reemplazado_por_symlink_se_detecta() -> None:
+    base = {"e": {"hash": "h", "modo": "0o644"}}
+    actual = {"e": {"tipo": "symlink", "destino": "x"}}
+    assert comparar(base, actual)["modificados"] == ["e"]
+
+
 def test_ciclo_completo_baseline_y_check(tmp_path) -> None:
     datos = tmp_path / "datos"          # directorio vigilado
     datos.mkdir()

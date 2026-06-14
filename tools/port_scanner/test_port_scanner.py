@@ -8,6 +8,7 @@ import socket
 import threading
 
 from port_scanner import (
+    _sanitizar_banner,
     agarrar_banner,
     describir,
     escanear,
@@ -109,3 +110,22 @@ def test_describir_servicios_conocidos_y_desconocidos() -> None:
     assert describir(443) == "HTTPS"
     assert describir(22) == "SSH"
     assert describir(49999) == "desconocido"
+
+
+def test_sanitizar_banner_neutraliza_secuencias_de_escape() -> None:
+    # Un host malicioso podría inyectar ANSI/escape en el banner.
+    sucio = "SSH-2.0 \x1b[31mFAKE\x1b[0m\x07\x00 ok"
+    limpio = _sanitizar_banner(sucio)
+    assert "\x1b" not in limpio
+    assert "\x07" not in limpio
+    assert "\x00" not in limpio
+    assert "SSH-2.0" in limpio and "FAKE" in limpio
+
+
+def test_agarrar_banner_devuelve_banner_sanitizado() -> None:
+    servidor, puerto = _servidor_con_banner(b"SSH-2.0 \x1b[31mX\x1b[0m\r\n")
+    try:
+        banner = agarrar_banner("127.0.0.1", puerto, timeout=1.0)
+        assert "\x1b" not in banner
+    finally:
+        servidor.close()

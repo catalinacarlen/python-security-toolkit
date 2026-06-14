@@ -21,6 +21,7 @@ import hashlib
 import hmac
 import json
 import os
+import sys
 import time
 
 
@@ -39,26 +40,43 @@ def modo_archivo(ruta: str) -> str:
 
 
 def generar_manifiesto(directorio: str) -> dict[str, dict]:
-    """Devuelve {ruta_relativa: {hash, modo}} para todos los archivos del directorio."""
+    """Devuelve {ruta_relativa: entrada} para todos los archivos del directorio.
+
+    Los archivos regulares se registran por su hash SHA-256 y sus permisos. Los
+    symlinks NO se siguen (no se hashea su destino, que podría apuntar fuera del árbol
+    monitoreado): se registran por su destino, lo que además permite detectar si un
+    archivo fue reemplazado por un enlace o si el destino del enlace cambió.
+    """
     manifiesto: dict[str, dict] = {}
-    for raiz, _dirs, archivos in os.walk(directorio):
+    for raiz, _dirs, archivos in os.walk(directorio):  # os.walk no sigue dirs symlink
         for nombre in archivos:
             completa = os.path.join(raiz, nombre)
             relativa = os.path.relpath(completa, directorio)
             try:
-                manifiesto[relativa] = {"hash": hash_archivo(completa), "modo": modo_archivo(completa)}
+                if os.path.islink(completa):
+                    manifiesto[relativa] = {"tipo": "symlink", "destino": os.readlink(completa)}
+                else:
+                    manifiesto[relativa] = {"hash": hash_archivo(completa), "modo": modo_archivo(completa)}
             except OSError:
                 continue  # archivo desaparecido o sin permiso de lectura
     return manifiesto
+
+
+def _clave_contenido(entrada: dict) -> tuple:
+    """Representación comparable del contenido de una entrada (archivo o symlink)."""
+    if entrada.get("tipo") == "symlink":
+        return ("symlink", entrada.get("destino"))
+    return ("file", entrada.get("hash"))
 
 
 def comparar(base: dict[str, dict], actual: dict[str, dict]) -> dict[str, list[str]]:
     """Compara dos manifiestos y clasifica los cambios (incluye permisos)."""
     base_set, actual_set = set(base), set(actual)
     comunes = base_set & actual_set
-    modificados = [r for r in comunes if base[r]["hash"] != actual[r]["hash"]]
+    modificados = [r for r in comunes if _clave_contenido(base[r]) != _clave_contenido(actual[r])]
     permisos = [r for r in comunes
-                if base[r]["hash"] == actual[r]["hash"] and base[r].get("modo") != actual[r].get("modo")]
+                if _clave_contenido(base[r]) == _clave_contenido(actual[r])
+                and base[r].get("modo") != actual[r].get("modo")]
     return {
         "modificados": sorted(modificados),
         "permisos": sorted(permisos),
@@ -99,10 +117,14 @@ def cargar_manifiesto(ruta: str, clave: str | None = None) -> dict[str, dict]:
         envoltura = json.load(archivo)
     # Retrocompatibilidad: un baseline viejo era el manifiesto plano.
     manifiesto = envoltura.get("manifiesto", envoltura) if isinstance(envoltura, dict) else envoltura
+    tiene_firma = isinstance(envoltura, dict) and "firma" in envoltura
     if clave:
         firma = envoltura.get("firma") if isinstance(envoltura, dict) else None
         if not firma or not verificar_firma(manifiesto, firma, clave):
             raise ValueError("Firma inválida: la línea de base pudo haber sido manipulada.")
+    elif tiene_firma:
+        print("Aviso: la línea de base está firmada pero no se indicó clave (-k); "
+              "la firma NO se verificó.", file=sys.stderr)
     return manifiesto
 
 
