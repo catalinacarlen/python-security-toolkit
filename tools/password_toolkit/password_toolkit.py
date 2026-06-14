@@ -28,13 +28,32 @@ from urllib import error, request
 
 NIVELES = {0: "Muy débil", 1: "Débil", 2: "Aceptable", 3: "Fuerte", 4: "Muy fuerte"}
 
-# Pequeña lista de contraseñas notoriamente comunes (offline). No pretende ser
-# exhaustiva: el chequeo serio es contra HIBP (ver verificar_filtrada).
-COMUNES = {
-    "password", "123456", "123456789", "qwerty", "12345678", "111111",
-    "1234567890", "1234567", "password1", "12345", "qwerty123", "1q2w3e",
-    "admin", "abc123", "letmein", "iloveyou", "monkey", "dragon", "football",
+# Tokens base notoriamente débiles: contraseñas comunes, nombres y palabras de uso
+# frecuente (ES/EN). Se comparan en forma normalizada (minúsculas, sin leet). No es
+# exhaustiva; el chequeo definitivo es contra HIBP (ver verificar_filtrada).
+DEBILES = {
+    # contraseñas y patrones de teclado
+    "password", "passw0rd", "qwerty", "qwertyuiop", "asdfgh", "zxcvbn", "1q2w3e",
+    "admin", "administrator", "root", "login", "welcome", "secret", "letmein",
+    "abc", "abcd", "test", "guest", "changeme", "default", "master", "access",
+    # afecto / palabras frecuentes
+    "iloveyou", "teamo", "love", "amor", "princesa", "princess", "hola", "hello",
+    "sunshine", "shadow", "monkey", "dragon", "ninja", "superman", "batman",
+    # deportes / cultura popular
+    "football", "futbol", "boca", "river", "barcelona", "madrid", "messi", "maradona",
+    "pokemon", "starwars",
+    # nombres comunes (ES/EN)
+    "juan", "maria", "jose", "santiago", "santi", "sofia", "lucia", "mateo", "martina",
+    "valentina", "agustin", "camila", "carlos", "laura", "pedro", "pablo", "diego",
+    "john", "michael", "jessica", "ashley", "daniel", "david", "sarah", "michelle",
+    # estaciones y meses (ES/EN)
+    "verano", "invierno", "otono", "primavera", "summer", "winter", "spring", "autumn",
+    "enero", "marzo", "agosto", "diciembre", "january", "march", "august", "december",
 }
+
+# Sustituciones "leet" más comunes, para no dejar pasar P4ssw0rd, Pr1nc3sa, etc.
+_LEET = str.maketrans({"4": "a", "3": "e", "1": "i", "0": "o", "5": "s", "7": "t",
+                       "@": "a", "$": "s", "8": "b"})
 
 # Secuencias usadas para penalizar (teclado y alfabeto/numérica).
 _SECUENCIAS = ["abcdefghijklmnopqrstuvwxyz", "0123456789", "qwertyuiop", "asdfghjkl", "zxcvbnm"]
@@ -59,9 +78,14 @@ def _tamano_alfabeto(password: str) -> int:
     return pool
 
 
+def _normalizar(texto: str) -> str:
+    """Pasa a minúsculas y revierte sustituciones leet para comparar contra DEBILES."""
+    return texto.lower().translate(_LEET)
+
+
 def _tiene_secuencia(password: str, largo: int = 4) -> bool:
     """True si contiene una secuencia ascendente/descendente de `largo` o más."""
-    p = password.lower()
+    p = _normalizar(password)
     for seq in _SECUENCIAS:
         for i in range(len(seq) - largo + 1):
             fragmento = seq[i:i + largo]
@@ -70,33 +94,64 @@ def _tiene_secuencia(password: str, largo: int = 4) -> bool:
     return False
 
 
-def _penalizacion_patrones(password: str) -> float:
-    """Devuelve bits a restar por debilidades estructurales."""
+def _entropia_estructural(password: str) -> float | None:
+    """Estima la entropía si la contraseña es "palabra débil + adornos".
+
+    Aísla el núcleo alfabético (quitando dígitos/símbolos de los extremos) y, si ese
+    núcleo es una palabra/nombre conocido, modela la contraseña como un patrón humano:
+    una palabra de diccionario (~14 bits) más adornos predecibles (años, símbolos al
+    final). Devuelve esa estimación, o None si no reconoce el patrón.
+    """
+    nucleo = re.sub(r"^[^A-Za-zÀ-ÿ]+|[^A-Za-zÀ-ÿ]+$", "", password)
+    if len(nucleo) < 3 or _normalizar(nucleo) not in DEBILES:
+        return None
+
+    bits = 14.0                                   # palabra de un diccionario común
+    if nucleo != nucleo.lower():                  # mayúsculas: ~1 bit, no log2(52)
+        bits += 1.0
+
+    idx = password.lower().find(nucleo.lower())
+    adornos = password[:idx] + password[idx + len(nucleo):]
+    for run in re.findall(r"\d+", adornos):       # dígitos: suelen ser años/fechas
+        bits += min(len(run) * math.log2(10), 10.0)
+    bits += sum(2.0 for c in adornos if c in string.punctuation)  # símbolos predecibles
+    bits += sum(1.0 for c in adornos if c == " ")
+    return bits
+
+
+def _penalizacion_generica(password: str) -> float:
+    """Bits a restar por debilidades estructurales no cubiertas por el patrón."""
     castigo = 0.0
-    p = password.lower()
-    if p in COMUNES or any(comun in p for comun in COMUNES if len(comun) >= 5):
-        castigo += 20
-    if re.search(r"(.)\1{2,}", password):           # 3+ caracteres repetidos seguidos
-        castigo += 8
-    if _tiene_secuencia(password):                  # secuencias de teclado/alfabeto
-        castigo += 8
-    if re.fullmatch(r"\d+", password):              # solo dígitos
-        castigo += 6
+    repeticiones = re.findall(r"((.)\2{2,})", password)   # corridas de 3+ iguales
+    if repeticiones:                                      # penaliza según la corrida más larga
+        castigo += max(len(r[0]) for r in repeticiones) * 3
+    if _tiene_secuencia(password):                        # secuencias de teclado/alfabeto
+        castigo += 12
+    if re.fullmatch(r"\d+", password):                    # solo dígitos
+        castigo += 10
+    if re.search(r"(?:18|19|20)\d\d", password):          # un año embebido
+        castigo += 7
     return castigo
 
 
 def entropia_bits(password: str) -> float:
-    """Entropía estimada en bits: len * log2(pool) menos penalizaciones.
+    """Entropía estimada en bits.
 
-    Es una aproximación pedagógica (modelo de "pool de caracteres"), suficiente
-    para comparar contraseñas y explicar por qué la longitud importa más que la
-    variedad. No reemplaza a un estimador como zxcvbn, pero captura lo esencial.
+    Combina dos estimaciones y toma la más pesimista: (1) un límite superior por
+    "pool de caracteres" (len * log2(alfabeto)); (2) una estimación estructural para
+    patrones humanos reconocibles (palabra común + año + símbolos). Sobre ese mínimo
+    se aplican penalizaciones genéricas (repeticiones, secuencias, años).
+
+    El resultado es una cota de resistencia a fuerza bruta; no modela todos los
+    ataques por diccionario, por lo que conviene complementarlo con verificar_filtrada.
     """
     if not password:
         return 0.0
     pool = _tamano_alfabeto(password)
     bruta = len(password) * math.log2(pool) if pool else 0.0
-    return max(0.0, bruta - _penalizacion_patrones(password))
+    estructural = _entropia_estructural(password)
+    estimacion = bruta if estructural is None else min(bruta, estructural)
+    return max(0.0, estimacion - _penalizacion_generica(password))
 
 
 def tiempo_crackeo(bits: float, adivinanzas_por_segundo: float = 1e10) -> str:

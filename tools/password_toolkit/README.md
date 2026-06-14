@@ -4,7 +4,7 @@ Password auditing utility. It scores password strength by estimated entropy, est
 
 ## Features
 
-- Strength scoring based on estimated entropy in bits, with penalties for common passwords, repeated characters and keyboard/alphabet sequences.
+- Strength scoring based on estimated entropy in bits. The estimate combines a character-pool upper bound with a structural estimate for recognizable human patterns (a common word or name followed by a year and/or trailing symbols) and takes the lower of the two. Includes leet-substitution normalization, embedded-year detection, and penalties for repeated runs and keyboard/alphabet sequences.
 - Crack-time estimation at a configurable guess rate.
 - Breach check against Have I Been Pwned using the k-anonymity model: only the first five characters of the SHA-1 hash are sent; the password is never transmitted. Degrades gracefully when offline.
 - Cryptographically secure password generation (`secrets`).
@@ -66,7 +66,7 @@ Utilidad de auditoría de contraseñas. Evalúa la fortaleza por entropía estim
 
 ## Características
 
-- Evaluación de fortaleza basada en entropía estimada en bits, con penalizaciones por contraseñas comunes, caracteres repetidos y secuencias de teclado/alfabeto.
+- Evaluación de fortaleza basada en entropía estimada en bits. La estimación combina un límite superior por pool de caracteres con una estimación estructural para patrones humanos reconocibles (una palabra o nombre común seguido de un año y/o símbolos al final) y toma el menor de los dos. Incluye normalización de sustituciones leet, detección de años embebidos y penalizaciones por corridas repetidas y secuencias de teclado/alfabeto.
 - Estimación del tiempo de crackeo a una tasa de adivinanzas configurable.
 - Verificación contra Have I Been Pwned mediante el modelo de k-anonymity: solo se envían los primeros cinco caracteres del hash SHA-1; la contraseña nunca se transmite. Degrada con elegancia sin conexión.
 - Generación de contraseñas criptográficamente segura (`secrets`).

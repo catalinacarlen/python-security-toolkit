@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] — 2026-06-14
+
+### Changed
+
+- **password_toolkit:** the entropy estimator now combines the character-pool upper
+  bound with a structural estimate for recognizable human patterns (a common
+  word or name followed by a year and/or trailing symbols) and takes the lower of
+  the two. Added leet-substitution normalization (e.g. `P4ssw0rd` → `password`), an
+  expanded list of weak base tokens (common passwords, names, words in ES/EN),
+  embedded-year detection, and repeated-run penalties scaled by run length. As a
+  result, templates such as `Princesa2002!` are now scored as very weak instead of
+  very strong. Passphrases and random passwords are unaffected.
+
 ## [0.2.0] — 2026-06-14
 
 The repository was packaged as an installable distribution with a unified CLI, and
@@ -63,6 +76,20 @@ Todos los cambios relevantes del proyecto se documentan aquí.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/),
 y el proyecto sigue [Versionado Semántico](https://semver.org/).
 
+## [0.3.0] — 2026-06-14
+
+### Cambiado
+
+- **password_toolkit:** el estimador de entropía ahora combina el límite superior por
+  pool de caracteres con una estimación estructural para patrones humanos reconocibles
+  (una palabra o nombre común seguido de un año y/o símbolos al final) y toma el menor
+  de los dos. Se agregó normalización de sustituciones leet (p. ej. `P4ssw0rd` →
+  `password`), una lista ampliada de tokens base débiles (contraseñas, nombres y
+  palabras comunes en ES/EN), detección de años embebidos y penalización por corridas
+  de caracteres repetidos escalada según su longitud. Como resultado, plantillas como
+  `Princesa2002!` se evalúan como muy débiles en lugar de muy fuertes. Las passphrases
+  y las contraseñas aleatorias no se ven afectadas.
+
 ## [0.2.0] — 2026-06-14
 
 El repositorio se empaquetó como una distribución instalable con un CLI unificado, y
@@ -115,4 +142,5 @@ puertos, analizador de logs, kit de contraseñas, verificador de integridad de a
 laboratorio de inyección SQL), cada una con su README y batería de tests, y un workflow
 de GitHub Actions que ejecuta los tests.
 
+[0.3.0]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.3.0
 [0.2.0]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.2.0

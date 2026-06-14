@@ -127,3 +127,33 @@ def test_auditar_offline_no_consulta_red() -> None:
     assert rep["comprometida"] is None
     assert rep["entropia_bits"] > 0
     assert "tiempo_crackeo_estimado" in rep
+
+
+# --- Detección de patrones humanos ------------------------------------------
+
+def test_palabra_mas_anio_es_debil() -> None:
+    # El patrón "palabra + año + símbolo" no debe puntuar como fuerte.
+    for pwd in ("Princesa2002!", "Verano2024!", "Santiago1990", "boca2024"):
+        puntaje, _ = evaluar_fortaleza(pwd)
+        assert puntaje <= 1, pwd
+        assert entropia_bits(pwd) < 30, pwd
+
+
+def test_sustituciones_leet_no_evaden_la_deteccion() -> None:
+    # P4ssw0rd se normaliza a password y debe quedar muy débil.
+    assert entropia_bits("P4ssw0rd!") < 30
+    assert evaluar_fortaleza("Pr1nc3sa")[0] <= 1
+
+
+def test_passphrase_se_mantiene_fuerte() -> None:
+    # Varias palabras no listadas no deben penalizarse como una sola débil.
+    assert evaluar_fortaleza("correct horse battery staple")[0] >= 3
+
+
+def test_aleatoria_larga_se_mantiene_fuerte() -> None:
+    assert evaluar_fortaleza("C0rr3ct-H0rs3_Battery$taple!9")[0] >= 3
+    assert evaluar_fortaleza("tR0ub4dour&3xKp9zL")[0] >= 3
+
+
+def test_anio_embebido_penaliza() -> None:
+    assert entropia_bits("MNbVcXz2001") < entropia_bits("MNbVcXzqplm")
