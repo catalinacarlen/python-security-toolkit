@@ -10,6 +10,10 @@ htmlcov/
 build/
 dist/
 
+# Entornos virtuales
+.venv/
+venv/
+
 # Salidas generadas por las herramientas
 baseline.json
 
