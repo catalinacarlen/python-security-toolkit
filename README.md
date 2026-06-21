@@ -8,11 +8,17 @@
 ![coverage](https://img.shields.io/badge/coverage-72%25-green)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
-A collection of security-focused command-line tools written in pure Python (standard library only). Each tool ships with documentation and an automated test suite, and all tools are accessible through a single `pstk` command.
+[Versión en español más abajo.](#español)
 
-Intended for use in authorized environments only.
+---
 
-## Tools
+## English
+
+A set of security-focused command-line tools written in pure Python (standard library only). Each tool comes with its own docs and an automated test suite, and they all run through a single `pstk` command.
+
+Use these only on systems you own or are authorized to test.
+
+### Tools
 
 | Tool | Description | Domain |
 |------|-------------|--------|
@@ -22,12 +28,12 @@ Intended for use in authorized environments only.
 | [file_integrity](tools/file_integrity) | File integrity monitoring with permission tracking, HMAC-signed baseline and watch mode | Integrity monitoring |
 | [sqli_lab](tools/sqli_lab) | SQL injection demonstration (UNION, blind, time-based) with a payload classifier | Application security |
 
-## Requirements
+### Requirements
 
 - Python 3.8 or newer
 - No runtime dependencies (standard library only)
 
-## Installation
+### Installation
 
 ```bash
 git clone https://github.com/catalinacarlen/python-security-toolkit
@@ -43,7 +49,7 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-## Usage
+### Usage
 
 All tools are available as subcommands of `pstk`:
 
@@ -58,7 +64,7 @@ pstk <tool> --help                               # options for a given tool
 
 Each tool can also be run as a standalone script, e.g. `python3 tools/port_scanner/port_scanner.py 127.0.0.1`.
 
-## Development
+### Development
 
 ```bash
 pip install -e ".[dev]"     # pytest, ruff, mypy, coverage
@@ -69,7 +75,7 @@ coverage run --source=tools,pstk -m pytest tools tests && coverage report
 
 Linting, type checking and the test suite run on every push via GitHub Actions.
 
-## Project structure
+### Project structure
 
 ```
 python-security-toolkit/
@@ -82,20 +88,19 @@ python-security-toolkit/
 └── LICENSE           # MIT
 ```
 
-## License
+### License
 
 Released under the MIT License. See [LICENSE](LICENSE).
 
 ---
----
 
-# Python Security Toolkit (ES)
+## Español
 
-Colección de herramientas de línea de comandos orientadas a la seguridad, escritas en Python puro (solo librería estándar). Cada herramienta incluye documentación y una batería de tests automáticos, y todas son accesibles a través de un único comando `pstk`.
+Un conjunto de herramientas de línea de comandos orientadas a la seguridad, escritas en Python puro (solo librería estándar). Cada una trae su documentación y una batería de tests automáticos, y todas corren a través de un único comando `pstk`.
 
-Destinado exclusivamente a entornos autorizados.
+Usalas solo en sistemas propios o que estás autorizada a testear.
 
-## Herramientas
+### Herramientas
 
 | Herramienta | Descripción | Dominio |
 |-------------|-------------|---------|
@@ -105,12 +110,12 @@ Destinado exclusivamente a entornos autorizados.
 | [file_integrity](tools/file_integrity) | Monitoreo de integridad con control de permisos, baseline firmado con HMAC y modo watch | Integridad |
 | [sqli_lab](tools/sqli_lab) | Demostración de inyección SQL (UNION, blind, time-based) con clasificador de payloads | Seguridad de aplicaciones |
 
-## Requisitos
+### Requisitos
 
 - Python 3.8 o superior
 - Sin dependencias en tiempo de ejecución (solo librería estándar)
 
-## Instalación
+### Instalación
 
 ```bash
 git clone https://github.com/catalinacarlen/python-security-toolkit
@@ -126,7 +131,7 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-## Uso
+### Uso
 
 Todas las herramientas son subcomandos de `pstk`:
 
@@ -141,7 +146,7 @@ pstk <herramienta> --help                        # opciones de cada herramienta
 
 Cada herramienta también puede ejecutarse como script independiente, p. ej. `python3 tools/port_scanner/port_scanner.py 127.0.0.1`.
 
-## Desarrollo
+### Desarrollo
 
 ```bash
 pip install -e ".[dev]"     # pytest, ruff, mypy, coverage
@@ -152,7 +157,7 @@ coverage run --source=tools,pstk -m pytest tools tests && coverage report
 
 El lint, el chequeo de tipos y los tests se ejecutan en cada push mediante GitHub Actions.
 
-## Estructura del proyecto
+### Estructura del proyecto
 
 ```
 python-security-toolkit/
@@ -165,6 +170,6 @@ python-security-toolkit/
 └── LICENSE           # MIT
 ```
 
-## Licencia
+### Licencia
 
 Distribuido bajo la Licencia MIT. Ver [LICENSE](LICENSE).
