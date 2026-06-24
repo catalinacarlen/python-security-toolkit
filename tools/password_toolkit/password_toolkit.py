@@ -339,12 +339,12 @@ def verificar_filtrada(password: str, timeout: float = 5.0) -> int | None:
     Devuelve la cantidad de apariciones (0 si no aparece) o None si no se pudo
     consultar (sin red, timeout, etc.).
     """
-    sha1 = hashlib.sha1(password.encode("utf-8")).hexdigest().upper()
+    sha1 = hashlib.sha1(password.encode("utf-8")).hexdigest().upper()  # nosec B324  # SHA1 lo exige la API k-anonymity de HaveIBeenPwned
     prefijo, sufijo = sha1[:5], sha1[5:]
     url = f"https://api.pwnedpasswords.com/range/{prefijo}"
     try:
         req = request.Request(url, headers={"User-Agent": "python-security-toolkit"})
-        with request.urlopen(req, timeout=timeout) as resp:
+        with request.urlopen(req, timeout=timeout) as resp:  # nosec B310  # URL fija HTTPS a api.pwnedpasswords.com, no controlada por el usuario
             cuerpo = resp.read().decode("utf-8")
     except (error.URLError, TimeoutError, OSError):
         return None
@@ -371,7 +371,7 @@ def auditar(password: str, offline: bool = False) -> dict:
     }
 
 
-_AYUDA_PWD = ("Contraseña. Si se omite, se solicita de forma segura (sin eco). "
+_AYUDA_PWD = ("Contraseña. Si se omite, se solicita de forma segura (sin eco). "  # nosec B105  # texto de ayuda, no una credencial
               "Pasarla como argumento es inseguro: queda en el historial del shell.")
 
 

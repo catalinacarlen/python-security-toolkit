@@ -42,7 +42,7 @@ def login_vulnerable(con: sqlite3.Connection, usuario: str, password: str) -> bo
     permite entrar sin contraseña. NO USAR JAMÁS EN PRODUCCIÓN.
     """
     consulta = (
-        "SELECT * FROM usuarios "
+        "SELECT * FROM usuarios "  # nosec B608  # vulnerable a proposito: este lab ensena SQL injection
         f"WHERE usuario = '{usuario}' AND password = '{password}'"
     )
     return con.execute(consulta).fetchone() is not None
@@ -56,7 +56,7 @@ def login_seguro(con: sqlite3.Connection, usuario: str, password: str) -> bool:
 
 def buscar_vulnerable(con: sqlite3.Connection, termino: str) -> list[tuple]:
     """Búsqueda VULNERABLE por nombre de usuario (permite demostrar UNION-based)."""
-    consulta = f"SELECT usuario, password FROM usuarios WHERE usuario = '{termino}'"
+    consulta = f"SELECT usuario, password FROM usuarios WHERE usuario = '{termino}'"  # nosec B608  # vulnerable a proposito: este lab ensena SQL injection
     return con.execute(consulta).fetchall()
 
 
