@@ -35,6 +35,9 @@ def test_despacha_a_pwd_offline(capsys) -> None:
 
 def test_despacha_a_logs_con_sample(capsys) -> None:
     ruta = cli.REPO_ROOT / "tools" / "log_analyzer" / "sample_auth.log"
-    cli.main(["logs", str(ruta), "--json"])
+    # logs sale con código 1 cuando hay alertas de severidad alta/crítica.
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["logs", str(ruta), "--json"])
+    assert exc.value.code == 1
     salida = capsys.readouterr().out
     assert "R001" in salida or "R004" in salida

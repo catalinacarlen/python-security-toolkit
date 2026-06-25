@@ -48,6 +48,11 @@ pstk logs sample_auth.log --json
 | `-w`, `--watchlist` | Comma-separated IPs to escalate | empty |
 | `--json` | JSON output | off |
 
+## Exit code
+
+Exits with `1` when there are alerts of high or critical severity, and `0` otherwise.
+This allows chaining the tool in a pipeline or cron job (e.g. page when a critical alert appears).
+
 ## Output
 
 ```
@@ -123,6 +128,11 @@ pstk logs sample_auth.log --json
 | `-v`, `--ventana` | Ventana en minutos para fuerza bruta | 2 |
 | `-w`, `--watchlist` | IPs separadas por coma a escalar | vacío |
 | `--json` | Salida JSON | off |
+
+## Código de salida
+
+Sale con `1` cuando hay alertas de severidad alta o crítica, y `0` en caso contrario.
+Esto permite encadenar la herramienta en un pipeline o cron (p. ej. paginar ante una alerta crítica).
 
 ## Salida
 

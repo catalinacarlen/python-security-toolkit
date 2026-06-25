@@ -55,6 +55,9 @@ _AUTH = re.compile(
 )
 # Cota anti-DoS: una línea no puede inyectar un número arbitrario de eventos.
 _MAX_REPETICIONES = 100_000
+# Cota anti-DoS: una línea de log legítima nunca es enorme; las patológicas se descartan
+# para evitar backtracking costoso de los regex con `.*`.
+_MAX_LINEA = 64 * 1024
 
 _MESES = {m: i for i, m in enumerate(
     ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], 1)}
@@ -151,6 +154,8 @@ def _iter_eventos(lineas: Iterable[str]) -> Iterator[Evento]:
     anio = _ANIO_BASE
     mes_prev: int | None = None
     for linea in lineas:
+        if len(linea) > _MAX_LINEA:
+            continue  # línea patológica: se descarta (hardening anti-DoS de regex)
         iso = _PREFIJO_ISO.match(linea)
         if iso:
             ts = _ts_iso(iso["ts"])
@@ -412,6 +417,13 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _codigo_salida(alertas: list[dict]) -> int:
+    """Código de salida para automatización: 1 si hay alertas de severidad alta o
+    crítica, 0 en caso contrario. Permite encadenar la herramienta en un pipeline o
+    cron de SOC (p. ej. paginar cuando aparece una crítica)."""
+    return 1 if any(a["severidad"] in ("crítica", "alta") for a in alertas) else 0
+
+
 def main() -> None:
     args = _parse_args()
     watchlist = {ip.strip() for ip in args.watchlist.split(",") if ip.strip()}
@@ -419,17 +431,16 @@ def main() -> None:
 
     if args.json:
         print(json.dumps(alertas, ensure_ascii=False, indent=2))
-        return
-
-    if not alertas:
+    elif not alertas:
         print("Sin alertas: no se detectaron patrones sospechosos.")
-        return
+    else:
+        print(f"{len(alertas)} alerta(s) detectada(s):\n")
+        for a in alertas:
+            marca = "  [watchlist]" if a.get("en_watchlist") else ""
+            print(f"[{a['severidad'].upper():<8}] {a['regla']}  {a['ip']:<16}{marca}")
+            print(f"           {a['descripcion']}")
 
-    print(f"{len(alertas)} alerta(s) detectada(s):\n")
-    for a in alertas:
-        marca = "  [watchlist]" if a.get("en_watchlist") else ""
-        print(f"[{a['severidad'].upper():<8}] {a['regla']}  {a['ip']:<16}{marca}")
-        print(f"           {a['descripcion']}")
+    raise SystemExit(_codigo_salida(alertas))
 
 
 if __name__ == "__main__":

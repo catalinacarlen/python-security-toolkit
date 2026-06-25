@@ -4,6 +4,8 @@ import os
 import types
 
 from log_analyzer import (
+    _MAX_LINEA,
+    _codigo_salida,
     _iter_eventos,
     analizar,
     analizar_archivo,
@@ -164,6 +166,21 @@ def test_rollover_de_anio_en_formato_bsd() -> None:
     ]
     ev = parsear(lineas)
     assert ev[1].ts.year == ev[0].ts.year + 1  # Ene quedó en el año siguiente
+
+
+# --- LOG-007 exit codes / LOG-008 cap de línea ------------------------------
+
+def test_codigo_salida_segun_severidad() -> None:
+    assert _codigo_salida([]) == 0
+    assert _codigo_salida([{"severidad": "media"}]) == 0
+    assert _codigo_salida([{"severidad": "alta"}]) == 1
+    assert _codigo_salida([{"severidad": "crítica"}]) == 1
+
+
+def test_linea_gigante_se_descarta() -> None:
+    relleno = "A" * (_MAX_LINEA + 1)
+    linea = f"May 11 10:00:01 h sshd[1]: {relleno} Failed password for root from 1.2.3.4 port 22 ssh2"
+    assert parsear([linea]) == []  # no se procesa la línea patológica
 
 
 # --- R001 fuerza bruta (con ventana temporal) -------------------------------

@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.1] — 2026-06-14
+
+### Added
+
+- **log_analyzer:** exit code for automation. The command exits with `1` when there are
+  alerts of high or critical severity and `0` otherwise, so it can be chained in a SOC
+  pipeline or cron job.
+
+### Security
+
+- **log_analyzer:** lines longer than 64 KB are skipped to avoid costly regex
+  backtracking on pathological input (DoS hardening).
+
 ## [0.5.0] — 2026-06-14
 
 ### Changed
@@ -290,6 +303,7 @@ puertos, analizador de logs, kit de contraseñas, verificador de integridad de a
 laboratorio de inyección SQL), cada una con su README y batería de tests, y un workflow
 de GitHub Actions que ejecuta los tests.
 
+[0.5.1]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.5.1
 [0.5.0]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.5.0
 [0.4.0]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.4.0
 [0.3.1]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.3.1
