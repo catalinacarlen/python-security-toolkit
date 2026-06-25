@@ -13,7 +13,10 @@ Detection engine for Linux authentication logs (`auth.log`). It parses authentic
 
 ## Features
 
-- Timestamp-aware parsing of failure and success events.
+- Timestamp-aware parsing of failure and success events, for both password and
+  public-key authentication, over IPv4 and IPv6 (addresses validated with `ipaddress`).
+- Expansion of syslog `message repeated N times` lines, so collapsed brute-force
+  bursts are not undercounted.
 - Sliding time window for brute-force detection.
 - IP watchlist that raises the severity of matching alerts.
 - Structured alerts (rule, severity, IP, description, evidence).
@@ -81,7 +84,11 @@ Motor de detección para logs de autenticación de Linux (`auth.log`). Parsea lo
 
 ## Características
 
-- Parseo de eventos de fallo y éxito con reconocimiento de timestamps.
+- Parseo de eventos de fallo y éxito con reconocimiento de timestamps, tanto para
+  autenticación por password como por clave pública, sobre IPv4 e IPv6 (direcciones
+  validadas con `ipaddress`).
+- Expansión de las líneas `message repeated N times` de syslog, para no subcontar las
+  ráfagas de fuerza bruta colapsadas.
 - Ventana de tiempo deslizante para la detección de fuerza bruta.
 - Watchlist de IPs que eleva la severidad de las alertas coincidentes.
 - Alertas estructuradas (regla, severidad, IP, descripción, evidencia).

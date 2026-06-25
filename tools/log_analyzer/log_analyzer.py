@@ -11,6 +11,11 @@ varias reglas de detección como lo haría un motor de correlación básico:
 - R004 Posible compromiso: un login EXITOSO desde una IP que venía fallando.
 - Watchlist: cualquier actividad desde IPs marcadas se eleva de severidad.
 
+Cobertura de parsing: autenticación por password y por publickey (fallo y éxito),
+IPv4 e IPv6 (validados con ipaddress), y expansión de las líneas colapsadas por
+"message repeated N times" de rsyslog/journald (que de otro modo permitirían evadir
+los umbrales). Las líneas con fecha o IP inválida se descartan sin abortar el análisis.
+
 Cada hallazgo se emite como una "alerta" estructurada (regla, severidad, IP,
 evidencia, ventana temporal), apta para salida JSON y para encadenar con otras
 herramientas.
@@ -21,25 +26,27 @@ Solo librería estándar. Para uso en entornos autorizados.
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import re
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-# Líneas de fallo:
-#   "May 11 10:12:01 host sshd[123]: Failed password for invalid user admin from 1.2.3.4 port 22 ssh2"
-PATRON_FALLO = re.compile(
-    r"^(?P<mes>\w{3})\s+(?P<dia>\d+)\s+(?P<hora>\d{2}:\d{2}:\d{2}).*"
-    r"Failed password for (?P<invalido>invalid user )?(?P<usuario>\S+) "
-    r"from (?P<ip>\d{1,3}(?:\.\d{1,3}){3})"
+# Prefijo de timestamp de syslog BSD: "May 11 10:12:01 host sshd[123]: <cuerpo>"
+_PREFIJO = re.compile(
+    r"^(?P<mes>\w{3})\s+(?P<dia>\d+)\s+(?P<hora>\d{2}:\d{2}:\d{2})\s+(?P<cuerpo>.*)$"
 )
-# Líneas de éxito:
-#   "May 11 10:15:42 host sshd[130]: Accepted password for cata from 1.2.3.4 port 22 ssh2"
-PATRON_EXITO = re.compile(
-    r"^(?P<mes>\w{3})\s+(?P<dia>\d+)\s+(?P<hora>\d{2}:\d{2}:\d{2}).*"
-    r"Accepted password for (?P<usuario>\S+) "
-    r"from (?P<ip>\d{1,3}(?:\.\d{1,3}){3})"
+# rsyslog/journald colapsan líneas idénticas: "message repeated N times: [ <linea> ]".
+# Sin esto, una ráfaga de fuerza bruta se contaría como UN solo fallo (evasión).
+_REPETIDO = re.compile(r"message repeated (?P<n>\d+) times:\s*\[\s*(?P<inner>.*?)\s*\]")
+# Eventos de autenticación SSH. Cubre password Y publickey, fallo Y éxito. La IP se
+# captura de forma agnóstica (v4/v6) y se valida aparte con el módulo ipaddress.
+_AUTH = re.compile(
+    r"(?P<resultado>Failed|Accepted) (?:password|publickey) for "
+    r"(?P<invalido>invalid user )?(?P<usuario>\S+) from (?P<ip>\S+)"
 )
+# Cota anti-DoS: una línea no puede inyectar un número arbitrario de eventos.
+_MAX_REPETICIONES = 100_000
 
 _MESES = {m: i for i, m in enumerate(
     ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], 1)}
@@ -81,22 +88,57 @@ def _sanitizar(texto: str) -> str:
     return "".join(c for c in texto if c.isprintable())
 
 
+def _ip_valida(token: str) -> str | None:
+    """Normaliza y valida una IP (v4 o v6). Devuelve None si el token no es una IP.
+
+    Usar ipaddress.ip_address en lugar de un regex casero da soporte a IPv6 gratis y
+    rechaza octetos imposibles (p. ej. 999.999.999.999) que un regex laxo dejaría pasar.
+    """
+    try:
+        return str(ipaddress.ip_address(token))
+    except ValueError:
+        return None
+
+
+def _evento_desde_cuerpo(cuerpo: str, ts: datetime) -> Evento | None:
+    """Extrae un Evento de autenticación del cuerpo de una línea, o None si no aplica."""
+    m = _AUTH.search(cuerpo)
+    if not m:
+        return None
+    ip = _ip_valida(m["ip"])
+    if ip is None:
+        return None
+    return Evento(
+        ts, ip, _sanitizar(m["usuario"]),
+        exito=(m["resultado"] == "Accepted"),
+        usuario_invalido=bool(m["invalido"]),
+    )
+
+
 def parsear(lineas: list[str]) -> list[Evento]:
-    """Convierte líneas de log en una lista de Eventos ordenada por tiempo."""
+    """Convierte líneas de log en una lista de Eventos ordenada por tiempo.
+
+    Reconoce password y publickey (fallo y éxito), expande las líneas colapsadas por
+    "message repeated N times" y descarta líneas con fecha o IP inválidas sin abortar.
+    """
     eventos: list[Evento] = []
     for linea in lineas:
-        m = PATRON_FALLO.search(linea)
-        if m:
-            eventos.append(Evento(
-                _timestamp(m["mes"], m["dia"], m["hora"]),
-                m["ip"], _sanitizar(m["usuario"]), exito=False,
-                usuario_invalido=bool(m["invalido"])))
+        pre = _PREFIJO.search(linea)
+        if not pre:
             continue
-        m = PATRON_EXITO.search(linea)
-        if m:
-            eventos.append(Evento(
-                _timestamp(m["mes"], m["dia"], m["hora"]),
-                m["ip"], _sanitizar(m["usuario"]), exito=True, usuario_invalido=False))
+        try:
+            ts = _timestamp(pre["mes"], pre["dia"], pre["hora"])
+        except ValueError:
+            continue  # fecha imposible (p. ej. "Feb 30"): se descarta la línea
+        cuerpo = pre["cuerpo"]
+        veces = 1
+        rep = _REPETIDO.search(cuerpo)
+        if rep:
+            veces = min(int(rep["n"]), _MAX_REPETICIONES)
+            cuerpo = rep["inner"]
+        evento = _evento_desde_cuerpo(cuerpo, ts)
+        if evento is not None:
+            eventos.extend([evento] * veces)
     return sorted(eventos, key=lambda e: e.ts)
 
 

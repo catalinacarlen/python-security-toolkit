@@ -4,6 +4,25 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] — 2026-06-14
+
+### Added
+
+- **log_analyzer:** authentication coverage now includes public-key logins
+  (`Failed`/`Accepted publickey`), so brute force (R001) and post-failure compromise
+  (R004) are no longer blind to key-based authentication.
+- **log_analyzer:** IPv6 support. Source addresses are validated and normalized with
+  the `ipaddress` module, which also rejects malformed IPv4 addresses (e.g. octets > 255).
+
+### Fixed
+
+- **log_analyzer:** lines collapsed by syslog as `message repeated N times: [ ... ]`
+  are now expanded into N events (capped to avoid resource exhaustion). Previously a
+  brute-force burst collapsed by rsyslog/journald was counted as a single failure and
+  could evade the threshold (MITRE ATT&CK T1110).
+- **log_analyzer:** lines with an impossible date (e.g. `Feb 30`) are now skipped
+  instead of aborting the analysis.
+
 ## [0.3.1] — 2026-06-14
 
 ### Security
@@ -107,6 +126,26 @@ Todos los cambios relevantes del proyecto se documentan aquí.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/),
 y el proyecto sigue [Versionado Semántico](https://semver.org/).
 
+## [0.4.0] — 2026-06-14
+
+### Agregado
+
+- **log_analyzer:** la cobertura de autenticación ahora incluye los logins por clave
+  pública (`Failed`/`Accepted publickey`), de modo que la fuerza bruta (R001) y el
+  compromiso tras fallos (R004) dejan de ser ciegos a la autenticación por clave.
+- **log_analyzer:** soporte de IPv6. Las direcciones de origen se validan y normalizan
+  con el módulo `ipaddress`, que además rechaza direcciones IPv4 malformadas (p. ej.
+  octetos > 255).
+
+### Corregido
+
+- **log_analyzer:** las líneas colapsadas por syslog como `message repeated N times: [ ... ]`
+  ahora se expanden en N eventos (con una cota para evitar agotamiento de recursos).
+  Antes, una ráfaga de fuerza bruta colapsada por rsyslog/journald se contaba como un
+  único fallo y podía evadir el umbral (MITRE ATT&CK T1110).
+- **log_analyzer:** las líneas con una fecha imposible (p. ej. `Feb 30`) ahora se
+  descartan en lugar de abortar el análisis.
+
 ## [0.3.1] — 2026-06-14
 
 ### Seguridad
@@ -208,6 +247,7 @@ puertos, analizador de logs, kit de contraseñas, verificador de integridad de a
 laboratorio de inyección SQL), cada una con su README y batería de tests, y un workflow
 de GitHub Actions que ejecuta los tests.
 
+[0.4.0]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.4.0
 [0.3.1]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.3.1
 [0.3.0]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.3.0
 [0.2.0]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.2.0
