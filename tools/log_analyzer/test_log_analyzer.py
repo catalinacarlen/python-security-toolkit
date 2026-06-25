@@ -1,8 +1,10 @@
 """Tests del analizador de logs (detecciones estilo SIEM)."""
 
 import os
+import types
 
 from log_analyzer import (
+    _iter_eventos,
     analizar,
     analizar_archivo,
     detectar_compromiso,
@@ -101,6 +103,67 @@ def test_message_repeated_respeta_cota_anti_dos() -> None:
     from log_analyzer import _MAX_REPETICIONES
     linea = "May 11 10:00:01 h sshd[1]: message repeated 999999999 times: [ Failed password for root from 9.9.9.9 port 22 ssh2]"
     assert len(parsear([linea])) == _MAX_REPETICIONES
+
+
+# --- LOG-004 streaming ------------------------------------------------------
+
+def test_iter_eventos_es_perezoso() -> None:
+    # No debe materializar la lista: es un generador (procesamiento en streaming).
+    assert isinstance(_iter_eventos([]), types.GeneratorType)
+
+
+# --- LOG-005 R004 sin falsos positivos --------------------------------------
+
+def test_compromiso_no_alerta_si_entra_otro_usuario_nat() -> None:
+    # Detrás de un NAT: 'ana' falla, 'beto' entra. NO debe ser un compromiso.
+    lineas = [
+        "May 11 10:00:01 h sshd[1]: Failed password for ana from 7.7.7.7 port 22 ssh2",
+        "May 11 10:00:02 h sshd[1]: Failed password for ana from 7.7.7.7 port 22 ssh2",
+        "May 11 10:00:03 h sshd[1]: Failed password for ana from 7.7.7.7 port 22 ssh2",
+        "May 11 10:00:05 h sshd[1]: Accepted password for beto from 7.7.7.7 port 22 ssh2",
+    ]
+    assert detectar_compromiso(parsear(lineas)) == []
+
+
+def test_compromiso_no_realerta_tras_reset() -> None:
+    # Tras el primer éxito el contador se resetea: un segundo éxito no re-alerta.
+    lineas = [
+        "May 11 10:00:01 h sshd[1]: Failed password for cata from 6.6.6.6 port 22 ssh2",
+        "May 11 10:00:02 h sshd[1]: Failed password for cata from 6.6.6.6 port 22 ssh2",
+        "May 11 10:00:03 h sshd[1]: Failed password for cata from 6.6.6.6 port 22 ssh2",
+        "May 11 10:00:04 h sshd[1]: Accepted password for cata from 6.6.6.6 port 22 ssh2",
+        "May 11 10:00:30 h sshd[1]: Accepted password for cata from 6.6.6.6 port 22 ssh2",
+    ]
+    assert len(detectar_compromiso(parsear(lineas))) == 1
+
+
+def test_compromiso_respeta_ventana() -> None:
+    # Fallos muy anteriores al éxito (fuera de ventana) no deben disparar R004.
+    lineas = [
+        "May 11 08:00:01 h sshd[1]: Failed password for cata from 6.6.6.6 port 22 ssh2",
+        "May 11 08:00:02 h sshd[1]: Failed password for cata from 6.6.6.6 port 22 ssh2",
+        "May 11 08:00:03 h sshd[1]: Failed password for cata from 6.6.6.6 port 22 ssh2",
+        "May 11 10:00:00 h sshd[1]: Accepted password for cata from 6.6.6.6 port 22 ssh2",
+    ]
+    assert detectar_compromiso(parsear(lineas), ventana_min=60) == []
+
+
+# --- LOG-006 timestamps (ISO 8601 y rollover de año) ------------------------
+
+def test_parsea_timestamp_iso8601_con_ipv6() -> None:
+    linea = "2024-05-11T10:00:01.123+00:00 h sshd[1]: Failed password for root from 2001:db8::5 port 22 ssh2"
+    ev = parsear([linea])
+    assert len(ev) == 1
+    assert ev[0].ts.year == 2024 and ev[0].ip == "2001:db8::5"
+
+
+def test_rollover_de_anio_en_formato_bsd() -> None:
+    lineas = [
+        "Dec 31 23:59:59 h sshd[1]: Failed password for root from 1.1.1.1 port 22 ssh2",
+        "Jan 01 00:00:30 h sshd[1]: Failed password for root from 1.1.1.1 port 22 ssh2",
+    ]
+    ev = parsear(lineas)
+    assert ev[1].ts.year == ev[0].ts.year + 1  # Ene quedó en el año siguiente
 
 
 # --- R001 fuerza bruta (con ventana temporal) -------------------------------

@@ -4,6 +4,27 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] — 2026-06-14
+
+### Changed
+
+- **log_analyzer:** the engine is now streaming. File analysis processes the log line
+  by line and keeps only per-detector state bounded by each rule's time window, instead
+  of loading the whole file and the full event list into memory. The in-memory
+  `analizar()` path still sorts events first.
+- **log_analyzer:** R004 (post-failure compromise) is correlated by (IP, user) within a
+  time window and resets on a successful login. This removes the false positives that
+  occurred behind NAT (one user fails, another succeeds) and the repeated alerts on
+  every subsequent success.
+- **log_analyzer:** all rules now use sliding time windows and alert once per episode,
+  reducing alert fatigue.
+
+### Added
+
+- **log_analyzer:** timestamp parsing for ISO 8601 / RFC 5424 logs (with year and time
+  zone, normalized to UTC), in addition to the BSD syslog format. For BSD timestamps the
+  year rollover (Dec → Jan within one file) is now inferred so events stay ordered.
+
 ## [0.4.0] — 2026-06-14
 
 ### Added
@@ -126,6 +147,28 @@ Todos los cambios relevantes del proyecto se documentan aquí.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/),
 y el proyecto sigue [Versionado Semántico](https://semver.org/).
 
+## [0.5.0] — 2026-06-14
+
+### Cambiado
+
+- **log_analyzer:** el motor ahora es streaming. El análisis de archivo procesa el log
+  línea por línea y mantiene solo el estado de cada detector, acotado por la ventana
+  temporal de cada regla, en lugar de cargar el archivo entero y la lista completa de
+  eventos en memoria. El camino en memoria `analizar()` sigue ordenando primero.
+- **log_analyzer:** R004 (compromiso tras fallos) ahora se correlaciona por (IP, usuario)
+  dentro de una ventana y se resetea con el login exitoso. Esto elimina los falsos
+  positivos detrás de NAT (un usuario falla, otro entra) y las alertas repetidas en
+  cada éxito posterior.
+- **log_analyzer:** todas las reglas usan ventanas de tiempo deslizantes y alertan una
+  vez por episodio, reduciendo la fatiga de alertas.
+
+### Agregado
+
+- **log_analyzer:** parseo de timestamps ISO 8601 / RFC 5424 (con año y zona horaria,
+  normalizados a UTC), además del formato BSD de syslog. Para los timestamps BSD se
+  infiere el cruce de año (Dic → Ene dentro de un mismo archivo) para que los eventos
+  queden ordenados.
+
 ## [0.4.0] — 2026-06-14
 
 ### Agregado
@@ -247,6 +290,7 @@ puertos, analizador de logs, kit de contraseñas, verificador de integridad de a
 laboratorio de inyección SQL), cada una con su README y batería de tests, y un workflow
 de GitHub Actions que ejecuta los tests.
 
+[0.5.0]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.5.0
 [0.4.0]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.4.0
 [0.3.1]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.3.1
 [0.3.0]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.3.0

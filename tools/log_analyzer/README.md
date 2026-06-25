@@ -9,7 +9,7 @@ Detection engine for Linux authentication logs (`auth.log`). It parses authentic
 | R001 | Brute force: failures from one IP exceeding a threshold within a sliding time window | High |
 | R002 | Password spraying: one IP attempting many distinct usernames with few attempts each | High |
 | R003 | User enumeration: repeated `invalid user` attempts from one IP | Medium |
-| R004 | Compromise: a successful login from an IP with prior failures | Critical |
+| R004 | Compromise: a successful login correlated with prior failures of the same (IP, user) within a window | Critical |
 
 ## Features
 
@@ -17,7 +17,10 @@ Detection engine for Linux authentication logs (`auth.log`). It parses authentic
   public-key authentication, over IPv4 and IPv6 (addresses validated with `ipaddress`).
 - Expansion of syslog `message repeated N times` lines, so collapsed brute-force
   bursts are not undercounted.
-- Sliding time window for brute-force detection.
+- BSD and ISO 8601 / RFC 5424 timestamps (the latter with year and time zone).
+- Streaming file analysis: the log is processed line by line with per-rule state bounded
+  by each detection window, so memory does not grow with the file size.
+- Sliding time windows for all rules; each fires once per episode.
 - IP watchlist that raises the severity of matching alerts.
 - Structured alerts (rule, severity, IP, description, evidence).
 - Plain-text or JSON output.
@@ -80,7 +83,7 @@ Motor de detección para logs de autenticación de Linux (`auth.log`). Parsea lo
 | R001 | Fuerza bruta: fallos de una IP que superan un umbral dentro de una ventana de tiempo deslizante | Alta |
 | R002 | Password spraying: una IP que prueba muchos usuarios distintos con pocos intentos cada uno | Alta |
 | R003 | Enumeración de usuarios: intentos repetidos de `invalid user` desde una IP | Media |
-| R004 | Compromiso: un login exitoso desde una IP con fallos previos | Crítica |
+| R004 | Compromiso: un login exitoso correlacionado con fallos previos del mismo (IP, usuario) dentro de una ventana | Crítica |
 
 ## Características
 
@@ -89,7 +92,11 @@ Motor de detección para logs de autenticación de Linux (`auth.log`). Parsea lo
   validadas con `ipaddress`).
 - Expansión de las líneas `message repeated N times` de syslog, para no subcontar las
   ráfagas de fuerza bruta colapsadas.
-- Ventana de tiempo deslizante para la detección de fuerza bruta.
+- Timestamps BSD e ISO 8601 / RFC 5424 (estos últimos con año y zona horaria).
+- Análisis de archivo en streaming: el log se procesa línea por línea con el estado de
+  cada regla acotado por su ventana, de modo que la memoria no crece con el tamaño del
+  archivo.
+- Ventanas de tiempo deslizantes en todas las reglas; cada una alerta una vez por episodio.
 - Watchlist de IPs que eleva la severidad de las alertas coincidentes.
 - Alertas estructuradas (regla, severidad, IP, descripción, evidencia).
 - Salida en texto plano o JSON.
