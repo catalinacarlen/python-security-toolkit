@@ -5,6 +5,7 @@ import types
 
 from log_analyzer import (
     _MAX_LINEA,
+    _alcance_ip,
     _codigo_salida,
     _iter_eventos,
     analizar,
@@ -13,8 +14,14 @@ from log_analyzer import (
     detectar_enumeracion,
     detectar_fuerza_bruta,
     detectar_spraying,
+    exportar_sigma,
     parsear,
 )
+
+
+def _fallos(ip: str, n: int) -> list[str]:
+    return [f"May 11 10:00:{k:02d} h sshd[1]: Failed password for root from {ip} port 22 ssh2"
+            for k in range(n)]
 
 
 def _reglas(alertas: list[dict]) -> set[str]:
@@ -181,6 +188,55 @@ def test_linea_gigante_se_descarta() -> None:
     relleno = "A" * (_MAX_LINEA + 1)
     linea = f"May 11 10:00:01 h sshd[1]: {relleno} Failed password for root from 1.2.3.4 port 22 ssh2"
     assert parsear([linea]) == []  # no se procesa la línea patológica
+
+
+# --- MITRE ATT&CK, severidad dinámica, allowlist, enriquecimiento, Sigma -----
+
+def test_alerta_lleva_tecnica_attack() -> None:
+    al = detectar_fuerza_bruta(parsear(_fallos("9.9.9.9", 6)))
+    assert al[0]["tecnica"] == "T1110.001"
+    assert "Password Guessing" in al[0]["tecnica_nombre"]
+
+
+def test_severidad_escala_por_volumen() -> None:
+    al = detectar_fuerza_bruta(parsear(_fallos("9.9.9.9", 55)))
+    severidades = {a["severidad"] for a in al}
+    assert "alta" in severidades and "crítica" in severidades
+
+
+def test_allowlist_suprime_eventos() -> None:
+    assert analizar(_fallos("9.9.9.9", 6), allowlist={"9.9.9.9"}) == []
+
+
+def test_enriquecimiento_alcance_de_ip() -> None:
+    assert _alcance_ip("127.0.0.1") == "loopback"
+    assert _alcance_ip("10.0.0.1") == "privada"
+    assert _alcance_ip("8.8.8.8") == "pública"
+
+
+def test_alerta_se_enriquece_con_contexto_de_red() -> None:
+    al = analizar(_fallos("8.8.8.8", 6))
+    assert al[0]["red"]["alcance"] == "pública"
+
+
+def test_geodb_externa_agrega_pais_y_asn(tmp_path) -> None:
+    db = tmp_path / "geo.csv"
+    db.write_text("9.9.9.0/24,US,AS999\n")
+    al = analizar(_fallos("9.9.9.9", 6), geodb=str(db))
+    assert al[0]["red"].get("pais") == "US"
+    assert al[0]["red"].get("asn") == "AS999"
+
+
+def test_exportar_sigma_incluye_tags_attack() -> None:
+    yaml = exportar_sigma()
+    for tag in ("attack.t1110.001", "attack.t1110.003", "attack.t1087", "attack.t1078"):
+        assert tag in yaml
+    assert yaml.count("title:") == 4
+    assert "logsource:" in yaml and "level:" in yaml
+
+
+def test_exportar_sigma_es_determinista() -> None:
+    assert exportar_sigma() == exportar_sigma()  # uuids estables (uuid5)
 
 
 # --- R001 fuerza bruta (con ventana temporal) -------------------------------

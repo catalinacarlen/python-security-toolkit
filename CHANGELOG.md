@@ -4,6 +4,23 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] — 2026-06-14
+
+### Added
+
+- **log_analyzer:** every alert is now tagged with its MITRE ATT&CK technique
+  (R001 → T1110.001, R002 → T1110.003, R003 → T1087, R004 → T1078).
+- **log_analyzer:** Sigma rule export (`--sigma`). The four detections are emitted as
+  Sigma rules (the open detection-rule standard, portable to Splunk/ELK/etc.), with
+  ATT&CK tags and references and stable rule IDs.
+- **log_analyzer:** allowlist (`-a` / `--allowlist`) that suppresses events from known-good
+  IPs before evaluation, complementing the watchlist (which raises severity).
+- **log_analyzer:** per-IP enrichment — every alert includes the IP scope
+  (private / public / loopback / link-local / reserved), and optional country/ASN from an
+  offline base (`--geodb`, a `cidr,country,asn` file).
+- **log_analyzer:** volume-based dynamic severity for R001 — escalates from high to
+  critical when the burst reaches 10× the threshold.
+
 ## [0.5.1] — 2026-06-14
 
 ### Added
@@ -160,6 +177,36 @@ Todos los cambios relevantes del proyecto se documentan aquí.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/),
 y el proyecto sigue [Versionado Semántico](https://semver.org/).
 
+## [0.6.0] — 2026-06-14
+
+### Agregado
+
+- **log_analyzer:** cada alerta se etiqueta con su técnica de MITRE ATT&CK
+  (R001 → T1110.001, R002 → T1110.003, R003 → T1087, R004 → T1078).
+- **log_analyzer:** export a reglas Sigma (`--sigma`). Las cuatro detecciones se emiten
+  como reglas Sigma (el estándar abierto de reglas de detección, portable a Splunk/ELK/
+  etc.), con tags y referencias de ATT&CK e IDs estables.
+- **log_analyzer:** allowlist (`-a` / `--allowlist`) que suprime los eventos de IPs
+  conocidas-buenas antes de evaluarlas, complementando la watchlist (que eleva severidad).
+- **log_analyzer:** enriquecimiento por IP — cada alerta incluye el alcance de la IP
+  (privada / pública / loopback / link-local / reservada) y, opcionalmente, país/ASN desde
+  una base offline (`--geodb`, un archivo `cidr,pais,asn`).
+- **log_analyzer:** severidad dinámica por volumen en R001 — escala de alta a crítica
+  cuando la ráfaga alcanza 10× el umbral.
+
+## [0.5.1] — 2026-06-14
+
+### Agregado
+
+- **log_analyzer:** código de salida para automatización. El comando sale con `1` cuando
+  hay alertas de severidad alta o crítica y `0` en caso contrario, para encadenarlo en un
+  pipeline o cron de SOC.
+
+### Seguridad
+
+- **log_analyzer:** se descartan las líneas de más de 64 KB para evitar el backtracking
+  costoso de los regex ante input patológico (hardening anti-DoS).
+
 ## [0.5.0] — 2026-06-14
 
 ### Cambiado
@@ -303,6 +350,7 @@ puertos, analizador de logs, kit de contraseñas, verificador de integridad de a
 laboratorio de inyección SQL), cada una con su README y batería de tests, y un workflow
 de GitHub Actions que ejecuta los tests.
 
+[0.6.0]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.6.0
 [0.5.1]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.5.1
 [0.5.0]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.5.0
 [0.4.0]: https://github.com/catalinacarlen/python-security-toolkit/releases/tag/v0.4.0
